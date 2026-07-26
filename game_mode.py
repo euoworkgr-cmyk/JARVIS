@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import argparse
-import ctypes
 import json
 import math
 import os
@@ -320,31 +319,6 @@ def scan_game_mode(gpu_threshold: float = DEFAULT_GPU_THRESHOLD) -> GameModeScan
     )
 
 
-def _request_window_close(processes: list[psutil.Process]) -> None:
-    if os.name != "nt" or not processes:
-        return
-
-    process_by_pid = {process.pid: process for process in processes}
-    user32 = ctypes.windll.user32
-    wm_close = 0x0010
-    enum_callback = ctypes.WINFUNCTYPE(
-        ctypes.c_bool,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-    )
-
-    @enum_callback
-    def close_window(window: int, _parameter: int) -> bool:
-        window_pid = ctypes.c_ulong()
-        user32.GetWindowThreadProcessId(window, ctypes.byref(window_pid))
-        process = process_by_pid.get(window_pid.value)
-        if process is not None and _is_process_running(process) and user32.IsWindowVisible(window):
-            user32.PostMessageW(window, wm_close, 0, 0)
-        return True
-
-    user32.EnumWindows(close_window, 0)
-
-
 def _is_process_running(process: psutil.Process) -> bool:
     try:
         return process.is_running()
@@ -369,10 +343,9 @@ def _matches_candidate(process: psutil.Process, candidate: ProcessCandidate) -> 
 
 def terminate_processes(
     candidates: list[ProcessCandidate],
-    graceful_timeout: float = 4.0,
-    force_timeout: float = 2.0,
+    kill_timeout: float = 2.0,
 ) -> GameModeResult:
-    """Validate app roots, then close each root and its complete process tree."""
+    """Validate app roots, then kill each root and its complete process tree."""
     closed: list[ProcessCandidate] = []
     failed_by_pid: dict[int, list[str]] = {}
     precheck_failed_pids: set[int] = set()
@@ -412,27 +385,8 @@ def terminate_processes(
             owner_by_identity[identity] = candidate
 
     all_processes = list(process_by_identity.values())
-    _request_window_close(all_processes)
-    _gone, alive = psutil.wait_procs(all_processes, timeout=graceful_timeout)
-
-    terminating: list[psutil.Process] = []
-    for process in alive:
-        try:
-            identity = (process.pid, process.create_time())
-            candidate = owner_by_identity[identity]
-        except (KeyError, psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
-            continue
-        try:
-            process.terminate()
-            terminating.append(process)
-        except psutil.NoSuchProcess:
-            pass
-        except (psutil.AccessDenied, psutil.Error) as error:
-            failed_by_pid.setdefault(candidate.pid, []).append(str(error))
-
-    _gone, alive = psutil.wait_procs(terminating, timeout=force_timeout)
-
-    for process in alive:
+    killed: list[psutil.Process] = []
+    for process in all_processes:
         try:
             identity = (process.pid, process.create_time())
             candidate = owner_by_identity[identity]
@@ -440,11 +394,22 @@ def terminate_processes(
             continue
         try:
             process.kill()
-            process.wait(timeout=force_timeout)
+            killed.append(process)
         except psutil.NoSuchProcess:
             pass
-        except (psutil.AccessDenied, psutil.TimeoutExpired, psutil.Error) as error:
+        except (psutil.AccessDenied, psutil.Error) as error:
             failed_by_pid.setdefault(candidate.pid, []).append(str(error))
+
+    _gone, alive = psutil.wait_procs(killed, timeout=kill_timeout)
+    for process in alive:
+        try:
+            identity = (process.pid, process.create_time())
+            candidate = owner_by_identity[identity]
+        except (KeyError, psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
+            continue
+        failed_by_pid.setdefault(candidate.pid, []).append(
+            f"Процесс PID {process.pid} не завершился после kill."
+        )
 
     initially_closed = {candidate.pid for candidate in closed}
     for candidate in candidates:
@@ -508,7 +473,9 @@ def main() -> int:
 
     if not args.yes:
         try:
-            answer = input("Закрыть эти процессы? [д/Н]: ").strip().casefold()
+            answer = input(
+                "Принудительно завершить эти приложения? [д/Н]: "
+            ).strip().casefold()
         except (EOFError, KeyboardInterrupt):
             print("\nОтменено.")
             return 0

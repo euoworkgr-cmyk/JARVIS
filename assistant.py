@@ -30,6 +30,15 @@ from game_mode import GameModeResult, GameModeScan, activate_game_mode, scan_gam
 APP_NAME = "JARVIS"
 APP_VERSION = "2.0"
 
+VPN_EXECUTABLE = Path(
+    r"C:\Users\Евгений\Documents\02_Код и проекты\VPN\HappTerminalVPN_CodexPowered\HappTerminalVPN_CodexPowered.exe"
+)
+CLAUDE_CODE_SHORTCUT = Path(r"C:\Users\Евгений\Desktop\Claude code.lnk")
+SPECIAL_LAUNCH_COMMANDS = {
+    "vpn": ("VPN", VPN_EXECUTABLE),
+    "claude code": ("Claude Code", CLAUDE_CODE_SHORTCUT),
+}
+
 THEME = Theme(
     {
         "jarvis.accent": "bold #D97757",
@@ -196,12 +205,34 @@ def launch_target(app_id: str) -> None:
     is_existing_file = os.path.isabs(expanded) and os.path.exists(expanded)
     is_uri = bool(re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", app_id))
 
-    if is_existing_file:
+    if is_existing_file and Path(expanded).suffix.casefold() == ".lnk":
+        os.startfile(expanded)
+    elif is_existing_file:
         subprocess.Popen([expanded])
     elif is_uri:
         os.startfile(app_id)
     else:
         subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{app_id}"])
+
+
+def open_special_command(command: str) -> LaunchResult:
+    target = SPECIAL_LAUNCH_COMMANDS.get(command.casefold())
+    if target is None:
+        return LaunchResult("not_found", f"Неизвестная команда «{command}»")
+
+    title, path = target
+    if not path.is_file():
+        return LaunchResult(
+            "error",
+            f"Не нашёл {title}",
+            str(path),
+        )
+
+    try:
+        launch_target(str(path))
+    except (OSError, subprocess.SubprocessError) as error:
+        return LaunchResult("error", f"Не удалось открыть {title}", str(error))
+    return LaunchResult("success", f"Открываю {title}", str(path))
 
 
 def open_program(program_name: str, program_map: dict[str, str]) -> LaunchResult:
@@ -337,7 +368,9 @@ class JarvisUI:
         commands.add_row("chrome", "Открыть программу по названию")
         commands.add_row("открой vs code", "Открыть программой-командой")
         commands.add_row("/apps", "Показать установленные программы")
-        commands.add_row("Протокол игры", "Найти и закрыть браузеры и GPU-нагрузку")
+        commands.add_row("VPN", "Открыть интерфейс Happ Terminal VPN")
+        commands.add_row("Claude code", "Запустить ярлык Claude Code")
+        commands.add_row("Протокол игры", "Найти и принудительно завершить GPU-нагрузку")
         commands.add_row("/game preview", "Показать, что будет закрыто")
         commands.add_row("/clear", "Очистить текущую сессию")
         commands.add_row("/help", "Показать эту справку")
@@ -416,7 +449,7 @@ class JarvisUI:
 
     def confirm_game_mode(self) -> bool:
         answer = console.input(
-            "  [jarvis.prompt]Закрыть эти процессы?[/] "
+            "  [jarvis.prompt]Принудительно завершить эти приложения?[/] "
             "[jarvis.muted][д/Н][/] "
         )
         return answer.strip().casefold() in {"д", "да", "y", "yes"}
@@ -498,6 +531,9 @@ def main() -> int:
             continue
         if lowered in {"/apps", "apps", "программы", "список программ"}:
             ui.show_programs(list(program_map))
+            continue
+        if lowered in SPECIAL_LAUNCH_COMMANDS:
+            ui.message(open_special_command(lowered))
             continue
         if lowered in GAME_MODE_PREVIEW_COMMANDS:
             ui.show_game_mode_scan(scan_game_mode())

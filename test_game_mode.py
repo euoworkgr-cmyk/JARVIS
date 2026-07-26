@@ -133,8 +133,7 @@ class GameModeTests(unittest.TestCase):
 
             result = game_mode.terminate_processes(
                 [candidate],
-                graceful_timeout=0.05,
-                force_timeout=1.0,
+                kill_timeout=1.0,
             )
 
             self.assertEqual(result.failed, [])
