@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -7,6 +9,18 @@ import assistant
 
 
 class AssistantSpecialCommandTests(unittest.TestCase):
+    def test_notes_command_is_registered(self) -> None:
+        self.assertIn("заметки", assistant.NOTES_COMMANDS)
+
+    def test_notes_are_saved_and_loaded_as_utf8(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "notes.json"
+            notes = ["Купить молоко", "Запустить Протокол игры"]
+
+            assistant.save_notes(notes, path)
+
+            self.assertEqual(assistant.load_notes(path), notes)
+
     def test_kill_command_is_extracted_before_program_search(self) -> None:
         self.assertEqual(assistant.extract_kill_target("kill chrome"), "chrome")
         self.assertEqual(assistant.extract_kill_target("KILL   Telegram"), "Telegram")

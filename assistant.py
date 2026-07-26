@@ -55,6 +55,7 @@ PRESET_COMMANDS = {
     "5": ("Камера", "камера"),
 }
 PRESET_LIST_COMMANDS = {"пресеты", "presets", "/presets"}
+NOTES_COMMANDS = {"заметки", "notes", "/notes"}
 KILL_PROCESS_ALIASES = {
     "vs code": "code",
     "вс код": "code",
@@ -141,6 +142,33 @@ def resource_directory() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS)
     return Path(__file__).resolve().parent
+
+
+def notes_file_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "notes.json"
+    return Path(__file__).resolve().parent / "notes.json"
+
+
+def load_notes(path: Path | None = None) -> list[str]:
+    notes_path = path or notes_file_path()
+    if not notes_path.exists():
+        return []
+    try:
+        data = json.loads(notes_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [str(note) for note in data if isinstance(note, str) and note.strip()]
+
+
+def save_notes(notes: list[str], path: Path | None = None) -> None:
+    notes_path = path or notes_file_path()
+    notes_path.write_text(
+        json.dumps(notes, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def get_program_map() -> dict[str, str]:
@@ -454,6 +482,7 @@ class JarvisUI:
         commands.add_row("/apps", "Показать установленные программы")
         commands.add_row("VPN", "Открыть интерфейс Happ Terminal VPN")
         commands.add_row("Claude code", "Запустить ярлык Claude Code")
+        commands.add_row("заметки", "Открыть встроенные заметки")
         commands.add_row("1", "Новое окно Яндекс Браузера")
         commands.add_row("2", "Открыть ChatGPT")
         commands.add_row("3", "Открыть VS Code")
@@ -556,6 +585,28 @@ class JarvisUI:
             )
         )
 
+    def show_notes(self, notes: list[str]) -> None:
+        table = Table(box=box.SIMPLE, show_header=True, header_style="jarvis.muted")
+        table.add_column("№", justify="right", style="jarvis.accent")
+        table.add_column("Заметка", style="jarvis.text", overflow="fold")
+        if notes:
+            for number, note in enumerate(notes, start=1):
+                table.add_row(str(number), note)
+        else:
+            table.add_row("—", "Заметок пока нет")
+        console.print()
+        console.print(
+            Panel(
+                table,
+                title="[jarvis.muted]ЗАМЕТКИ[/]",
+                subtitle="[jarvis.muted]добавить <текст> · удалить <№> · очистить · назад[/]",
+                title_align="left",
+                border_style="jarvis.border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+
     def show_kill_scan(self, target: str, scan: GameModeScan) -> None:
         if not scan.candidates:
             self.message(
@@ -643,6 +694,56 @@ class JarvisUI:
         console.print(farewell)
 
 
+def run_notes_mode(ui: JarvisUI, path: Path | None = None) -> None:
+    notes_path = path or notes_file_path()
+    notes = load_notes(notes_path)
+    ui.show_notes(notes)
+
+    while True:
+        try:
+            command = ui.prompt()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            return
+        normalized = " ".join(command.casefold().split())
+        if normalized in {"назад", "выход", "back", "exit", "/exit"}:
+            return
+        if not normalized or normalized in {"список", "показать", "list"}:
+            ui.show_notes(notes)
+            continue
+        if normalized in {"очистить", "clear"}:
+            notes.clear()
+        elif normalized.startswith("добавить ") or normalized.startswith("add "):
+            note = command.split(maxsplit=1)[1].strip()
+            if note:
+                notes.append(note)
+        elif normalized.startswith("удалить ") or normalized.startswith("delete "):
+            raw_number = command.split(maxsplit=1)[1].strip()
+            try:
+                index = int(raw_number) - 1
+                if index < 0:
+                    raise ValueError
+                notes.pop(index)
+            except (ValueError, IndexError):
+                ui.message(LaunchResult("not_found", f"Нет заметки №{raw_number}"))
+                continue
+        else:
+            ui.message(
+                LaunchResult(
+                    "not_found",
+                    "Неизвестная команда заметок",
+                    "Используйте: добавить <текст>, удалить <№>, очистить или назад.",
+                )
+            )
+            continue
+        try:
+            save_notes(notes, notes_path)
+        except OSError as error:
+            ui.message(LaunchResult("error", "Не удалось сохранить заметки", str(error)))
+            continue
+        ui.show_notes(notes)
+
+
 def configure_terminal() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -693,6 +794,9 @@ def main() -> int:
             continue
         if lowered in PRESET_LIST_COMMANDS:
             ui.show_presets()
+            continue
+        if lowered in NOTES_COMMANDS:
+            run_notes_mode(ui)
             continue
         kill_target = extract_kill_target(command)
         if kill_target is not None:
