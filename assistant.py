@@ -188,7 +188,14 @@ def find_program(
     if not program_map:
         return None, 0
 
+    exact_name = " ".join(program_name.casefold().split())
+    if exact_name in program_map:
+        return exact_name, 100
+
     normalized = normalize_program_name(program_name)
+    if normalized in program_map:
+        return normalized, 100
+
     match = process.extractOne(
         normalized,
         program_map.keys(),

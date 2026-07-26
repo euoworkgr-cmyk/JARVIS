@@ -7,6 +7,16 @@ import assistant
 
 
 class AssistantSpecialCommandTests(unittest.TestCase):
+    def test_exact_cyrillic_program_name_bypasses_ascii_fuzzy_search(self) -> None:
+        program_map = {
+            "камера": "Microsoft.WindowsCamera_8wekyb3d8bbwe!App",
+        }
+
+        self.assertEqual(
+            assistant.find_program("камера", program_map),
+            ("камера", 100),
+        )
+
     def test_vpn_command_uses_configured_executable(self) -> None:
         with (
             patch("assistant.Path.is_file", return_value=True),
@@ -80,6 +90,15 @@ class AssistantSpecialCommandTests(unittest.TestCase):
             with self.subTest(number=number):
                 assistant.open_preset(number, {})
                 open_mock.assert_called_with(program_name, {})
+
+    @patch("assistant.launch_target")
+    def test_camera_preset_launches_registered_camera_app(self, launch_mock) -> None:
+        camera_app_id = "Microsoft.WindowsCamera_8wekyb3d8bbwe!App"
+
+        result = assistant.open_preset("5", {"камера": camera_app_id})
+
+        self.assertEqual(result.kind, "success")
+        launch_mock.assert_called_once_with(camera_app_id)
 
 
 if __name__ == "__main__":
