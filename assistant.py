@@ -34,9 +34,19 @@ VPN_EXECUTABLE = Path(
     r"C:\Users\Евгений\Documents\02_Код и проекты\VPN\HappTerminalVPN_CodexPowered\HappTerminalVPN_CodexPowered.exe"
 )
 CLAUDE_CODE_SHORTCUT = Path(r"C:\Users\Евгений\Desktop\Claude code.lnk")
+YANDEX_BROWSER_EXECUTABLE = Path(
+    r"C:\Program Files\Yandex\YandexBrowser\Application\browser.exe"
+)
 SPECIAL_LAUNCH_COMMANDS = {
-    "vpn": ("VPN", VPN_EXECUTABLE),
-    "claude code": ("Claude Code", CLAUDE_CODE_SHORTCUT),
+    "vpn": ("VPN", VPN_EXECUTABLE, True),
+    "claude code": ("Claude Code", CLAUDE_CODE_SHORTCUT, False),
+}
+PRESET_COMMANDS = {
+    "1": ("Новое окно Яндекс Браузера", None),
+    "2": ("ChatGPT", "chatgpt"),
+    "3": ("VS Code", "visual studio code"),
+    "4": ("Telegram", "telegram"),
+    "5": ("Камера", "камера"),
 }
 
 THEME = Theme(
@@ -215,12 +225,23 @@ def launch_target(app_id: str) -> None:
         subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{app_id}"])
 
 
+def launch_console_target(path: Path) -> None:
+    """Start a console app with input isolated from the JARVIS console."""
+    creation_flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+    subprocess.Popen(
+        [str(path)],
+        cwd=str(path.parent),
+        creationflags=creation_flags,
+        close_fds=True,
+    )
+
+
 def open_special_command(command: str) -> LaunchResult:
     target = SPECIAL_LAUNCH_COMMANDS.get(command.casefold())
     if target is None:
         return LaunchResult("not_found", f"Неизвестная команда «{command}»")
 
-    title, path = target
+    title, path, new_console = target
     if not path.is_file():
         return LaunchResult(
             "error",
@@ -229,10 +250,38 @@ def open_special_command(command: str) -> LaunchResult:
         )
 
     try:
-        launch_target(str(path))
+        if new_console:
+            launch_console_target(path)
+        else:
+            launch_target(str(path))
     except (OSError, subprocess.SubprocessError) as error:
         return LaunchResult("error", f"Не удалось открыть {title}", str(error))
     return LaunchResult("success", f"Открываю {title}", str(path))
+
+
+def open_preset(number: str, program_map: dict[str, str]) -> LaunchResult:
+    preset = PRESET_COMMANDS.get(number)
+    if preset is None:
+        return LaunchResult("not_found", f"Неизвестный пресет №{number}")
+
+    title, program_name = preset
+    if number == "1":
+        if not YANDEX_BROWSER_EXECUTABLE.is_file():
+            return LaunchResult(
+                "error",
+                "Не нашёл Яндекс Браузер",
+                str(YANDEX_BROWSER_EXECUTABLE),
+            )
+        try:
+            subprocess.Popen(
+                [str(YANDEX_BROWSER_EXECUTABLE), "--new-window"],
+                cwd=str(YANDEX_BROWSER_EXECUTABLE.parent),
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            return LaunchResult("error", f"Не удалось открыть {title}", str(error))
+        return LaunchResult("success", f"Открываю: {title}")
+
+    return open_program(str(program_name), program_map)
 
 
 def open_program(program_name: str, program_map: dict[str, str]) -> LaunchResult:
@@ -370,6 +419,11 @@ class JarvisUI:
         commands.add_row("/apps", "Показать установленные программы")
         commands.add_row("VPN", "Открыть интерфейс Happ Terminal VPN")
         commands.add_row("Claude code", "Запустить ярлык Claude Code")
+        commands.add_row("1", "Новое окно Яндекс Браузера")
+        commands.add_row("2", "Открыть ChatGPT")
+        commands.add_row("3", "Открыть VS Code")
+        commands.add_row("4", "Открыть Telegram")
+        commands.add_row("5", "Открыть Камеру")
         commands.add_row("Протокол игры", "Найти и принудительно завершить GPU-нагрузку")
         commands.add_row("/game preview", "Показать, что будет закрыто")
         commands.add_row("/clear", "Очистить текущую сессию")
@@ -534,6 +588,9 @@ def main() -> int:
             continue
         if lowered in SPECIAL_LAUNCH_COMMANDS:
             ui.message(open_special_command(lowered))
+            continue
+        if lowered in PRESET_COMMANDS:
+            ui.message(open_preset(lowered, program_map))
             continue
         if lowered in GAME_MODE_PREVIEW_COMMANDS:
             ui.show_game_mode_scan(scan_game_mode())
