@@ -1,0 +1,535 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+from typing import Literal
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="Using slow pure-python SequenceMatcher.*",
+    module="fuzzywuzzy.fuzz",
+)
+from fuzzywuzzy import fuzz, process
+from rich import box
+from rich.columns import Columns
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+from rich.theme import Theme
+
+from game_mode import GameModeResult, GameModeScan, activate_game_mode, scan_game_mode
+
+
+APP_NAME = "JARVIS"
+APP_VERSION = "2.0"
+
+THEME = Theme(
+    {
+        "jarvis.accent": "bold #D97757",
+        "jarvis.text": "#E8E3DC",
+        "jarvis.heading": "bold #E8E3DC",
+        "jarvis.muted": "#8C8882",
+        "jarvis.border": "#514B46",
+        "jarvis.success": "bold #A6C26F",
+        "jarvis.error": "bold #E06C75",
+        "jarvis.prompt": "bold #F0EAE2",
+    }
+)
+
+console = Console(theme=THEME, highlight=False)
+
+
+# Common spoken/transliterated names that do not fuzzy-match their Start menu names.
+TRANSLIT_MAP = {
+    "вс код": "vs code",
+    "хром": "chrome",
+    "телеграм": "telegram",
+    "дискорд": "discord",
+    "ворд": "word",
+    "эксель": "excel",
+    "пауэрпоинт": "powerpoint",
+    "блокнот": "notepad",
+    "калькулятор": "calculator",
+    "проводник": "explorer",
+    "настройки": "settings",
+    "почта": "mail",
+    "карты": "maps",
+    "фотографии": "photos",
+    "музыка": "music",
+    "видео": "movies & tv",
+    "магазин": "store",
+    "параметры": "settings",
+    "календарь": "calendar",
+    "погода": "weather",
+    "новости": "news",
+    "заметки": "sticky notes",
+    "рисование": "paint",
+    "камера": "camera",
+    "запись голоса": "voice recorder",
+    "ножницы": "snipping tool",
+    "центр отзывов": "feedback hub",
+    "часы": "alarms & clock",
+    "экранная клавиатура": "on-screen keyboard",
+    "экранная лупа": "magnifier",
+    "экранный диктор": "narrator",
+    "яндекс музыка": "яндекс.музыка",
+}
+
+EXIT_COMMANDS = {"/exit", "/quit", "выход", "выйти", "exit", "quit"}
+GAME_MODE_COMMANDS = {
+    "/game",
+    "game mode",
+    "игровой режим",
+    "протокол игры",
+    "включи игровой режим",
+    "запусти игровой режим",
+}
+GAME_MODE_PREVIEW_COMMANDS = {
+    "/game preview",
+    "проверь игровой режим",
+    "что закроет игровой режим",
+}
+
+
+@dataclass(frozen=True)
+class LaunchResult:
+    kind: Literal["success", "error", "not_found"]
+    title: str
+    detail: str = ""
+
+
+def resource_directory() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent
+
+
+def get_program_map() -> dict[str, str]:
+    json_path = resource_directory() / "programs.json"
+    if not json_path.exists():
+        return {}
+
+    try:
+        with json_path.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    if not isinstance(data, dict):
+        return {}
+    return {
+        str(name).lower(): str(app_id)
+        for name, app_id in data.items()
+        if name and app_id
+    }
+
+
+def generate_program_map() -> tuple[dict[str, str], str | None]:
+    if getattr(sys, "frozen", False):
+        return {}, "В сборке отсутствует список программ."
+
+    generator_path = resource_directory() / "get_programs.py"
+    if not generator_path.exists():
+        return {}, f"Не найден {generator_path.name}."
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(generator_path)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        return {}, f"Не удалось обновить список: {error}"
+
+    program_map = get_program_map()
+    if not program_map:
+        detail = result.stderr.strip() or result.stdout.strip()
+        return {}, detail or "Генератор вернул пустой список."
+    return program_map, None
+
+
+def normalize_program_name(program_name: str) -> str:
+    normalized = " ".join(program_name.lower().split())
+    return TRANSLIT_MAP.get(normalized, normalized)
+
+
+def find_program(
+    program_name: str, program_map: dict[str, str]
+) -> tuple[str | None, int]:
+    if not program_map:
+        return None, 0
+
+    normalized = normalize_program_name(program_name)
+    match = process.extractOne(
+        normalized,
+        program_map.keys(),
+        scorer=fuzz.token_set_ratio,
+    )
+    if not match:
+        return None, 0
+
+    best_name, best_score = match
+    if best_score < 80:
+        for name in program_map:
+            if normalized in name:
+                score = fuzz.partial_ratio(normalized, name)
+                if score > best_score:
+                    best_name, best_score = name, score
+
+    if best_score < 70:
+        return None, best_score
+    return best_name, best_score
+
+
+def launch_target(app_id: str) -> None:
+    expanded = os.path.expandvars(app_id)
+    is_existing_file = os.path.isabs(expanded) and os.path.exists(expanded)
+    is_uri = bool(re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", app_id))
+
+    if is_existing_file:
+        subprocess.Popen([expanded])
+    elif is_uri:
+        os.startfile(app_id)
+    else:
+        subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{app_id}"])
+
+
+def open_program(program_name: str, program_map: dict[str, str]) -> LaunchResult:
+    best_name, score = find_program(program_name, program_map)
+    if best_name is None:
+        return LaunchResult(
+            "not_found",
+            f"Не нашёл «{program_name}»",
+            "Попробуйте название из меню «Пуск» или более короткий вариант.",
+        )
+
+    app_id = program_map.get(best_name)
+    if not app_id:
+        return LaunchResult(
+            "error",
+            f"У «{best_name}» нет команды запуска",
+            "Обновите programs.json и попробуйте снова.",
+        )
+
+    try:
+        launch_target(app_id)
+    except (OSError, subprocess.SubprocessError) as error:
+        return LaunchResult(
+            "error",
+            f"Не удалось открыть {best_name}",
+            str(error),
+        )
+
+    return LaunchResult(
+        "success",
+        f"Открываю {best_name}",
+        f"Совпадение {score}% · команда выполнена",
+    )
+
+
+def extract_program_name(command: str) -> str:
+    value = " ".join(command.strip().split())
+    lowered = value.lower()
+    for prefix in ("открой", "запусти", "open", "run"):
+        if lowered == prefix:
+            return ""
+        marker = f"{prefix} "
+        if lowered.startswith(marker):
+            return value[len(marker) :].strip()
+    return value
+
+
+class JarvisUI:
+    def __init__(self, program_count: int) -> None:
+        self.program_count = program_count
+
+    def render_welcome(self) -> None:
+        console.clear()
+        brand = Text()
+        brand.append("✦  ", style="jarvis.accent")
+        brand.append(APP_NAME, style="jarvis.heading")
+        brand.append(f"  v{APP_VERSION}\n", style="jarvis.muted")
+        brand.append("   Desktop launcher", style="jarvis.muted")
+
+        status = Text()
+        status.append("● ", style="jarvis.success")
+        status.append("готов к работе", style="jarvis.text")
+        status.append(
+            f"   ·   {self.program_count} программ в индексе",
+            style="jarvis.muted",
+        )
+
+        header = Table.grid(expand=True)
+        header.add_column(ratio=1)
+        header.add_row(brand)
+        header.add_row("")
+        header.add_row(status)
+
+        console.print(
+            Panel(
+                header,
+                border_style="jarvis.border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+        console.print()
+        console.print("  Что запустить?", style="jarvis.heading")
+        console.print(
+            "  Введите название программы или команду «открой …».",
+            style="jarvis.muted",
+        )
+        console.print(
+            "  [jarvis.muted]/help[/] — команды   "
+            "[jarvis.muted]/apps[/] — программы   "
+            "[jarvis.muted]/game[/] — игровой режим   "
+            "[jarvis.muted]/clear[/] — очистить   "
+            "[jarvis.muted]/exit[/] — выйти"
+        )
+
+    def prompt(self) -> str:
+        line_width = max(24, min(console.width - 6, 92))
+        console.print()
+        console.print(
+            f"  ╭{'─' * line_width}",
+            style="jarvis.border",
+        )
+        value = console.input(
+            "[jarvis.border]  │[/] [jarvis.prompt]❯[/] "
+        )
+        console.print(
+            f"  ╰{'─' * line_width}",
+            style="jarvis.border",
+        )
+        return value.strip()
+
+    def message(self, result: LaunchResult) -> None:
+        styles = {
+            "success": ("✓", "jarvis.success"),
+            "error": ("!", "jarvis.error"),
+            "not_found": ("?", "jarvis.accent"),
+        }
+        symbol, style = styles[result.kind]
+
+        message = Table.grid(padding=(0, 1))
+        message.add_column(width=3)
+        message.add_column()
+        message.add_row(Text(symbol, style=style), Text(result.title, style="jarvis.text"))
+        if result.detail:
+            message.add_row("", Text(result.detail, style="jarvis.muted"))
+        console.print()
+        console.print(message)
+
+    def show_help(self) -> None:
+        commands = Table.grid(padding=(0, 2))
+        commands.add_column(style="jarvis.accent", no_wrap=True)
+        commands.add_column(style="jarvis.text")
+        commands.add_row("chrome", "Открыть программу по названию")
+        commands.add_row("открой vs code", "Открыть программой-командой")
+        commands.add_row("/apps", "Показать установленные программы")
+        commands.add_row("Протокол игры", "Найти и закрыть браузеры и GPU-нагрузку")
+        commands.add_row("/game preview", "Показать, что будет закрыто")
+        commands.add_row("/clear", "Очистить текущую сессию")
+        commands.add_row("/help", "Показать эту справку")
+        commands.add_row("/exit", "Завершить JARVIS")
+        console.print()
+        console.print(
+            Panel(
+                commands,
+                title="[jarvis.muted]КОМАНДЫ[/]",
+                title_align="left",
+                border_style="jarvis.border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+
+    def show_programs(self, program_names: list[str]) -> None:
+        if not program_names:
+            self.message(
+                LaunchResult(
+                    "not_found",
+                    "Список программ пуст",
+                    "Запустите get_programs.py, чтобы обновить индекс.",
+                )
+            )
+            return
+
+        entries = [
+            Text(f"• {name}", style="jarvis.text")
+            for name in sorted(program_names, key=str.casefold)
+        ]
+        console.print()
+        console.print(
+            Panel(
+                Columns(entries, equal=True, expand=True, padding=(0, 2)),
+                title=f"[jarvis.muted]ПРОГРАММЫ · {len(entries)}[/]",
+                title_align="left",
+                subtitle="[jarvis.muted]Введите любое название для запуска[/]",
+                subtitle_align="left",
+                border_style="jarvis.border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+
+    def show_game_mode_scan(self, scan: GameModeScan) -> None:
+        console.print()
+        if scan.warning:
+            console.print(f"  !  {scan.warning}", style="jarvis.accent")
+        if not scan.candidates:
+            self.message(
+                LaunchResult(
+                    "success",
+                    "Закрывать нечего",
+                    "Браузеры не запущены, заметной GPU-нагрузки нет.",
+                )
+            )
+            return
+
+        table = Table(box=box.SIMPLE, show_header=True, header_style="jarvis.muted")
+        table.add_column("Процесс", style="jarvis.text")
+        table.add_column("PID", justify="right", style="jarvis.muted")
+        table.add_column("Причина", style="jarvis.accent")
+        for candidate in scan.candidates:
+            table.add_row(candidate.name, str(candidate.pid), candidate.reason)
+        console.print(
+            Panel(
+                table,
+                title=f"[jarvis.muted]ИГРОВОЙ РЕЖИМ · {len(scan.candidates)}[/]",
+                title_align="left",
+                border_style="jarvis.border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+
+    def confirm_game_mode(self) -> bool:
+        answer = console.input(
+            "  [jarvis.prompt]Закрыть эти процессы?[/] "
+            "[jarvis.muted][д/Н][/] "
+        )
+        return answer.strip().casefold() in {"д", "да", "y", "yes"}
+
+    def show_game_mode_result(self, result: GameModeResult) -> None:
+        if result.failed:
+            details = "; ".join(
+                f"{candidate.name} (PID {candidate.pid})"
+                for candidate, _error in result.failed
+            )
+            self.message(
+                LaunchResult(
+                    "error",
+                    f"Закрыто {len(result.closed)}, не удалось {len(result.failed)}",
+                    details,
+                )
+            )
+            return
+        self.message(
+            LaunchResult(
+                "success",
+                "Игровой режим включён",
+                f"Закрыто процессов: {len(result.closed)}",
+            )
+        )
+
+    def goodbye(self) -> None:
+        console.print()
+        farewell = Text()
+        farewell.append("✦  ", style="jarvis.accent")
+        farewell.append("Сессия завершена.", style="jarvis.text")
+        console.print(farewell)
+
+
+def configure_terminal() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.SetConsoleTitleW(f"{APP_NAME} · Desktop launcher")
+        except OSError:
+            pass
+
+
+def main() -> int:
+    configure_terminal()
+    program_map = get_program_map()
+    startup_error = None
+    if not program_map:
+        program_map, startup_error = generate_program_map()
+
+    ui = JarvisUI(len(program_map))
+    ui.render_welcome()
+    if startup_error:
+        ui.message(LaunchResult("error", "Список программ недоступен", startup_error))
+
+    while True:
+        try:
+            command = ui.prompt()
+        except (EOFError, KeyboardInterrupt):
+            ui.goodbye()
+            return 0
+
+        lowered = command.lower()
+        if not command:
+            continue
+        if lowered in EXIT_COMMANDS:
+            ui.goodbye()
+            return 0
+        if lowered in {"/clear", "clear", "очистить"}:
+            ui.render_welcome()
+            continue
+        if lowered in {"/help", "help", "помощь"}:
+            ui.show_help()
+            continue
+        if lowered in {"/apps", "apps", "программы", "список программ"}:
+            ui.show_programs(list(program_map))
+            continue
+        if lowered in GAME_MODE_PREVIEW_COMMANDS:
+            ui.show_game_mode_scan(scan_game_mode())
+            continue
+        if lowered in GAME_MODE_COMMANDS:
+            scan = scan_game_mode()
+            ui.show_game_mode_scan(scan)
+            if not scan.candidates:
+                continue
+            try:
+                confirmed = ui.confirm_game_mode()
+            except (EOFError, KeyboardInterrupt):
+                confirmed = False
+                console.print()
+            if not confirmed:
+                ui.message(LaunchResult("success", "Игровой режим отменён"))
+                continue
+            ui.show_game_mode_result(activate_game_mode(scan))
+            continue
+
+        program_name = extract_program_name(command)
+        if not program_name:
+            ui.message(
+                LaunchResult(
+                    "not_found",
+                    "После команды нужно название",
+                    "Например: открой VS Code",
+                )
+            )
+            continue
+        ui.message(open_program(program_name, program_map))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
