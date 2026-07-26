@@ -138,6 +138,12 @@ class LaunchResult:
     detail: str = ""
 
 
+@dataclass(frozen=True)
+class PowerCommand:
+    action: Literal["shutdown", "restart", "sleep", "abort"]
+    delay_seconds: int = 0
+
+
 def resource_directory() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS)
@@ -387,6 +393,47 @@ def extract_kill_target(command: str) -> str | None:
     return None
 
 
+def extract_power_command(command: str) -> PowerCommand | None:
+    value = " ".join(command.strip().casefold().split())
+    shutdown_match = re.fullmatch(r"выключить пк(?:\s*\(\s*(\d+)\s*\))?", value)
+    if shutdown_match:
+        minutes = int(shutdown_match.group(1) or 0)
+        return PowerCommand("shutdown", minutes * 60)
+    if value.startswith("выключить пк"):
+        raise ValueError("Укажите время целым числом минут: выключить пк(30)")
+    if value in {"перезагрузка", "перезагрузить пк", "перезагрузить компьютер"}:
+        return PowerCommand("restart")
+    if value in {"спящий режим", "сон", "усыпить пк", "усыпить компьютер"}:
+        return PowerCommand("sleep")
+    if value in {"отменить выключение", "отмена выключения"}:
+        return PowerCommand("abort")
+    return None
+
+
+def execute_power_command(command: PowerCommand) -> LaunchResult:
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if command.action == "shutdown":
+        args = ["shutdown.exe", "-s", "-t", str(command.delay_seconds)]
+        if command.delay_seconds:
+            title = f"Выключение запланировано через {command.delay_seconds // 60} мин."
+        else:
+            title = "Выключаю компьютер"
+    elif command.action == "restart":
+        args = ["shutdown.exe", "-r", "-t", "0"]
+        title = "Перезагружаю компьютер"
+    elif command.action == "abort":
+        args = ["shutdown.exe", "-a"]
+        title = "Запланированное выключение отменено"
+    else:
+        args = ["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"]
+        title = "Перевожу компьютер в спящий режим"
+    try:
+        subprocess.Popen(args, creationflags=creation_flags)
+    except (OSError, subprocess.SubprocessError) as error:
+        return LaunchResult("error", "Не удалось выполнить команду питания", str(error))
+    return LaunchResult("success", title)
+
+
 def normalize_kill_target(target: str) -> str:
     normalized = normalize_program_name(target)
     return KILL_PROCESS_ALIASES.get(normalized, normalized)
@@ -483,6 +530,10 @@ class JarvisUI:
         commands.add_row("VPN", "Открыть интерфейс Happ Terminal VPN")
         commands.add_row("Claude code", "Запустить ярлык Claude Code")
         commands.add_row("заметки", "Открыть встроенные заметки")
+        commands.add_row("выключить пк(30)", "Выключить компьютер через 30 минут")
+        commands.add_row("перезагрузка", "Немедленно перезагрузить компьютер")
+        commands.add_row("спящий режим", "Перевести компьютер в спящий режим")
+        commands.add_row("отменить выключение", "Отменить таймер выключения")
         commands.add_row("1", "Новое окно Яндекс Браузера")
         commands.add_row("2", "Открыть ChatGPT")
         commands.add_row("3", "Открыть VS Code")
@@ -797,6 +848,14 @@ def main() -> int:
             continue
         if lowered in NOTES_COMMANDS:
             run_notes_mode(ui)
+            continue
+        try:
+            power_command = extract_power_command(command)
+        except ValueError as error:
+            ui.message(LaunchResult("error", "Некорректная команда выключения", str(error)))
+            continue
+        if power_command is not None:
+            ui.message(execute_power_command(power_command))
             continue
         kill_target = extract_kill_target(command)
         if kill_target is not None:

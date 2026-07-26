@@ -9,6 +9,46 @@ import assistant
 
 
 class AssistantSpecialCommandTests(unittest.TestCase):
+    def test_shutdown_delay_is_converted_from_minutes_to_seconds(self) -> None:
+        self.assertEqual(
+            assistant.extract_power_command("Выключить пк(30)"),
+            assistant.PowerCommand("shutdown", 1800),
+        )
+        self.assertEqual(
+            assistant.extract_power_command("выключить пк"),
+            assistant.PowerCommand("shutdown", 0),
+        )
+
+    def test_restart_sleep_and_abort_power_commands(self) -> None:
+        self.assertEqual(
+            assistant.extract_power_command("перезагрузка"),
+            assistant.PowerCommand("restart"),
+        )
+        self.assertEqual(
+            assistant.extract_power_command("спящий режим"),
+            assistant.PowerCommand("sleep"),
+        )
+        self.assertEqual(
+            assistant.extract_power_command("отменить выключение"),
+            assistant.PowerCommand("abort"),
+        )
+
+    def test_invalid_shutdown_delay_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            assistant.extract_power_command("выключить пк(полчаса)")
+
+    @patch("assistant.subprocess.Popen")
+    def test_shutdown_uses_windows_seconds_argument(self, popen_mock) -> None:
+        result = assistant.execute_power_command(
+            assistant.PowerCommand("shutdown", 1800)
+        )
+
+        self.assertEqual(result.kind, "success")
+        popen_mock.assert_called_once_with(
+            ["shutdown.exe", "-s", "-t", "1800"],
+            creationflags=assistant.subprocess.CREATE_NO_WINDOW,
+        )
+
     def test_notes_command_is_registered(self) -> None:
         self.assertIn("заметки", assistant.NOTES_COMMANDS)
 
