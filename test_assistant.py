@@ -7,6 +7,19 @@ import assistant
 
 
 class AssistantSpecialCommandTests(unittest.TestCase):
+    def test_kill_command_is_extracted_before_program_search(self) -> None:
+        self.assertEqual(assistant.extract_kill_target("kill chrome"), "chrome")
+        self.assertEqual(assistant.extract_kill_target("KILL   Telegram"), "Telegram")
+        self.assertEqual(assistant.extract_kill_target("kill"), "")
+        self.assertIsNone(assistant.extract_kill_target("chrome"))
+
+    def test_kill_aliases_map_to_real_process_names(self) -> None:
+        self.assertEqual(assistant.normalize_kill_target("яндекс"), "browser")
+        self.assertEqual(assistant.normalize_kill_target("vs code"), "code")
+
+    def test_preset_list_command_is_registered(self) -> None:
+        self.assertIn("пресеты", assistant.PRESET_LIST_COMMANDS)
+
     def test_exact_cyrillic_program_name_bypasses_ascii_fuzzy_search(self) -> None:
         program_map = {
             "камера": "Microsoft.WindowsCamera_8wekyb3d8bbwe!App",

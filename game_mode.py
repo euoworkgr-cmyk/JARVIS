@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import argparse
+from difflib import SequenceMatcher
 import json
 import math
 import os
@@ -317,6 +318,70 @@ def scan_game_mode(gpu_threshold: float = DEFAULT_GPU_THRESHOLD) -> GameModeScan
         gpu_monitor_available=not warning,
         warning=warning,
     )
+
+
+def _process_name_score(query: str, process_name: str) -> int:
+    normalized_query = query.casefold().removesuffix(".exe").strip()
+    normalized_name = process_name.casefold().removesuffix(".exe").strip()
+    if not normalized_query or not normalized_name:
+        return 0
+    if normalized_query == normalized_name:
+        return 100
+    if normalized_query in normalized_name or normalized_name in normalized_query:
+        return 92
+    return round(SequenceMatcher(None, normalized_query, normalized_name).ratio() * 100)
+
+
+def scan_named_processes(query: str, match_threshold: int = 72) -> GameModeScan:
+    """Find complete non-protected application trees matching a kill query."""
+    protected_pids = _protected_pids()
+    matches: list[tuple[int, ProcessCandidate]] = []
+
+    for process in psutil.process_iter(["pid", "name", "create_time"]):
+        try:
+            pid = int(process.info["pid"])
+            name = str(process.info["name"] or f"PID {pid}")
+        except (psutil.Error, TypeError, ValueError):
+            continue
+        if _is_protected(pid, name, protected_pids):
+            continue
+
+        root = _find_application_root(process, protected_pids)
+        try:
+            root_pid = root.pid
+            root_name = root.name()
+            root_create_time = root.create_time()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
+            continue
+        if _is_protected(root_pid, root_name, protected_pids):
+            continue
+
+        score = _process_name_score(query, root_name)
+        if score < match_threshold:
+            continue
+        matches.append(
+            (
+                score,
+                ProcessCandidate(
+                    pid=root_pid,
+                    name=root_name,
+                    create_time=root_create_time,
+                    gpu_usage=0.0,
+                    reason=f"kill · совпадение {score}%",
+                ),
+            )
+        )
+
+    if not matches:
+        return GameModeScan([], False)
+
+    best_score = max(score for score, _candidate in matches)
+    unique: dict[tuple[int, float], ProcessCandidate] = {}
+    for score, candidate in matches:
+        if score == best_score:
+            unique[(candidate.pid, candidate.create_time)] = candidate
+    candidates = sorted(unique.values(), key=lambda item: (item.name.casefold(), item.pid))
+    return GameModeScan(candidates, False)
 
 
 def _is_process_running(process: psutil.Process) -> bool:

@@ -40,6 +40,26 @@ class FakeProcess:
 
 
 class GameModeTests(unittest.TestCase):
+    def test_empty_process_name_never_matches_kill_query(self) -> None:
+        self.assertEqual(game_mode._process_name_score("chrome", ""), 0)
+
+    @patch("game_mode._protected_pids", return_value=set())
+    @patch("game_mode.psutil.process_iter")
+    def test_named_kill_finds_application_root(
+        self,
+        process_iter_mock,
+        _protected_mock,
+    ) -> None:
+        root = FakeProcess(200, "chrome.exe", 20.0)
+        child = FakeProcess(201, "chrome.exe", 21.0, root)
+        process_iter_mock.return_value = [root, child]
+
+        scan = game_mode.scan_named_processes("chrome")
+
+        self.assertEqual(len(scan.candidates), 1)
+        self.assertEqual(scan.candidates[0].pid, root.pid)
+        self.assertIn("100%", scan.candidates[0].reason)
+
     def test_comet_is_recognized_as_browser(self) -> None:
         self.assertIn("comet.exe", game_mode.BROWSER_NAMES)
 

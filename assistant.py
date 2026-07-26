@@ -24,7 +24,13 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-from game_mode import GameModeResult, GameModeScan, activate_game_mode, scan_game_mode
+from game_mode import (
+    GameModeResult,
+    GameModeScan,
+    activate_game_mode,
+    scan_game_mode,
+    scan_named_processes,
+)
 
 
 APP_NAME = "JARVIS"
@@ -47,6 +53,13 @@ PRESET_COMMANDS = {
     "3": ("VS Code", "visual studio code"),
     "4": ("Telegram", "telegram"),
     "5": ("Камера", "камера"),
+}
+PRESET_LIST_COMMANDS = {"пресеты", "presets", "/presets"}
+KILL_PROCESS_ALIASES = {
+    "vs code": "code",
+    "вс код": "code",
+    "яндекс": "browser",
+    "яндекс браузер": "browser",
 }
 
 THEME = Theme(
@@ -336,6 +349,21 @@ def extract_program_name(command: str) -> str:
     return value
 
 
+def extract_kill_target(command: str) -> str | None:
+    value = " ".join(command.strip().split())
+    lowered = value.casefold()
+    if lowered == "kill":
+        return ""
+    if lowered.startswith("kill "):
+        return value[5:].strip()
+    return None
+
+
+def normalize_kill_target(target: str) -> str:
+    normalized = normalize_program_name(target)
+    return KILL_PROCESS_ALIASES.get(normalized, normalized)
+
+
 class JarvisUI:
     def __init__(self, program_count: int) -> None:
         self.program_count = program_count
@@ -431,6 +459,8 @@ class JarvisUI:
         commands.add_row("3", "Открыть VS Code")
         commands.add_row("4", "Открыть Telegram")
         commands.add_row("5", "Открыть Камеру")
+        commands.add_row("пресеты", "Показать список цифровых пресетов")
+        commands.add_row("kill chrome", "Принудительно завершить запущенное приложение")
         commands.add_row("Протокол игры", "Найти и принудительно завершить GPU-нагрузку")
         commands.add_row("/game preview", "Показать, что будет закрыто")
         commands.add_row("/clear", "Очистить текущую сессию")
@@ -505,6 +535,74 @@ class JarvisUI:
                 border_style="jarvis.border",
                 box=box.ROUNDED,
                 padding=(1, 2),
+            )
+        )
+
+    def show_presets(self) -> None:
+        table = Table(box=box.SIMPLE, show_header=True, header_style="jarvis.muted")
+        table.add_column("№", justify="right", style="jarvis.accent")
+        table.add_column("Пресет", style="jarvis.text")
+        for number, (title, _program_name) in PRESET_COMMANDS.items():
+            table.add_row(number, title)
+        console.print()
+        console.print(
+            Panel(
+                table,
+                title="[jarvis.muted]ПРЕСЕТЫ[/]",
+                title_align="left",
+                border_style="jarvis.border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+
+    def show_kill_scan(self, target: str, scan: GameModeScan) -> None:
+        if not scan.candidates:
+            self.message(
+                LaunchResult(
+                    "not_found",
+                    f"Не нашёл запущенный процесс «{target}»",
+                    "Защищённые системные процессы не показываются.",
+                )
+            )
+            return
+        table = Table(box=box.SIMPLE, show_header=True, header_style="jarvis.muted")
+        table.add_column("Процесс", style="jarvis.text")
+        table.add_column("PID", justify="right", style="jarvis.muted")
+        table.add_column("Совпадение", style="jarvis.accent")
+        for candidate in scan.candidates:
+            table.add_row(candidate.name, str(candidate.pid), candidate.reason)
+        console.print()
+        console.print(
+            Panel(
+                table,
+                title=f"[jarvis.muted]KILL · {target}[/]",
+                title_align="left",
+                border_style="jarvis.border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+
+    def show_kill_result(self, target: str, result: GameModeResult) -> None:
+        if result.failed:
+            details = "; ".join(
+                f"{candidate.name} (PID {candidate.pid}): {error}"
+                for candidate, error in result.failed
+            )
+            self.message(
+                LaunchResult(
+                    "error",
+                    f"Не удалось завершить «{target}»",
+                    details,
+                )
+            )
+            return
+        self.message(
+            LaunchResult(
+                "success",
+                f"Принудительно завершено: {target}",
+                f"Деревьев процесов: {len(result.closed)}",
             )
         )
 
@@ -592,6 +690,35 @@ def main() -> int:
             continue
         if lowered in {"/apps", "apps", "программы", "список программ"}:
             ui.show_programs(list(program_map))
+            continue
+        if lowered in PRESET_LIST_COMMANDS:
+            ui.show_presets()
+            continue
+        kill_target = extract_kill_target(command)
+        if kill_target is not None:
+            if not kill_target:
+                ui.message(
+                    LaunchResult(
+                        "not_found",
+                        "После kill нужно название программы",
+                        "Например: kill chrome",
+                    )
+                )
+                continue
+            normalized_target = normalize_kill_target(kill_target)
+            scan = scan_named_processes(normalized_target)
+            ui.show_kill_scan(kill_target, scan)
+            if not scan.candidates:
+                continue
+            try:
+                confirmed = ui.confirm_game_mode()
+            except (EOFError, KeyboardInterrupt):
+                confirmed = False
+                console.print()
+            if not confirmed:
+                ui.message(LaunchResult("success", "Kill отменён"))
+                continue
+            ui.show_kill_result(kill_target, activate_game_mode(scan))
             continue
         if lowered in SPECIAL_LAUNCH_COMMANDS:
             ui.message(open_special_command(lowered))
