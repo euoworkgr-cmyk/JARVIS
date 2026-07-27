@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -13,6 +15,7 @@ from PySide6.QtQuick import QQuickWindow
 from PySide6.QtWidgets import QApplication
 
 from command_service import CommandOutcome, CommandRequest, CommandService, HistoryStore
+from desktop_app import _parse_icon_location, resolve_windows_icon_source
 from desktop_backend import DesktopBackend, _format_bytes
 
 
@@ -90,6 +93,32 @@ class PersonalAppTests(unittest.TestCase):
             target = backend.program_icon_target("program/demo")
 
         self.assertEqual(target, str(executable))
+
+    def test_icon_location_keeps_embedded_icon_index(self) -> None:
+        self.assertEqual(
+            _parse_icon_location(r'C:\Program Files\Demo\Demo.exe,-7'),
+            (r'C:\Program Files\Demo\Demo.exe', -7),
+        )
+
+    def test_regular_executable_is_not_treated_as_shortcut(self) -> None:
+        target = r'C:\Program Files\Demo\Demo.exe'
+        self.assertEqual(resolve_windows_icon_source(target), (target, 0))
+
+    @patch("desktop_app.subprocess.run")
+    def test_shortcut_icon_uses_original_source_without_overlay(self, run_mock) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            shortcut = Path(directory) / "Demo.lnk"
+            icon = Path(directory) / "Demo.exe"
+            shortcut.touch()
+            icon.touch()
+            run_mock.return_value.stdout = json.dumps(
+                {"TargetPath": str(icon), "IconLocation": f"{icon},3"}
+            )
+            resolve_windows_icon_source.cache_clear()
+
+            source = resolve_windows_icon_source(str(shortcut))
+
+        self.assertEqual(source, (str(icon), 3))
 
     def test_quick_launch_uses_compact_titles_that_fit_cards(self) -> None:
         root = Path(__file__).resolve().parent

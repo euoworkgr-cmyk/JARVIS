@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
+from functools import lru_cache
+import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 from PySide6.QtCore import QFileInfo, QIODevice, QObject, QSize, Qt, QTimer, QUrl, Signal
@@ -17,6 +20,72 @@ from desktop_backend import DesktopBackend
 
 
 INSTANCE_NAME = "Supersonic.Desktop.Instance"
+
+
+def _parse_icon_location(value: str) -> tuple[str, int]:
+    location = value.strip().strip('"')
+    if not location:
+        return "", 0
+    path, separator, raw_index = location.rpartition(",")
+    if separator:
+        try:
+            return path.strip().strip('"'), int(raw_index.strip())
+        except ValueError:
+            pass
+    return location, 0
+
+
+@lru_cache(maxsize=128)
+def resolve_windows_icon_source(target: str) -> tuple[str, int]:
+    """Resolve a .lnk to its original icon source without the shortcut overlay."""
+    path = Path(target)
+    if os.name != "nt" or path.suffix.casefold() != ".lnk":
+        return target, 0
+
+    environment = os.environ.copy()
+    environment["SUPERSONIC_SHORTCUT_PATH"] = str(path)
+    script = (
+        "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);"
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut("
+        "$env:SUPERSONIC_SHORTCUT_PATH);"
+        "@{TargetPath=$s.TargetPath;IconLocation=$s.IconLocation}"
+        "|ConvertTo-Json -Compress"
+    )
+    try:
+        completed = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                script,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8-sig",
+            errors="replace",
+            timeout=4,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            env=environment,
+        )
+        shortcut = json.loads(completed.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, TypeError):
+        return target, 0
+
+    icon_path, icon_index = _parse_icon_location(
+        str(shortcut.get("IconLocation", ""))
+    )
+    candidates = [
+        (icon_path, icon_index),
+        (str(shortcut.get("TargetPath", "")), 0),
+    ]
+    for candidate, index in candidates:
+        expanded = Path(os.path.expandvars(candidate.strip().strip('"')))
+        if candidate and expanded.is_file():
+            return str(expanded), index
+    return target, 0
 
 
 def ensure_windows_autostart(
@@ -66,18 +135,57 @@ class ProgramIconProvider(QQuickImageProvider):
             return QPixmap()
 
         dimensions = requested_size if requested_size.isValid() else QSize(32, 32)
-        pixmap = self._windows_pixmap(target, dimensions)
+        icon_source, icon_index = resolve_windows_icon_source(target)
+        pixmap = self._windows_pixmap(icon_source, dimensions, icon_index)
         if pixmap.isNull():
-            pixmap = self.file_icons.icon(QFileInfo(target)).pixmap(dimensions)
+            pixmap = self.file_icons.icon(QFileInfo(icon_source)).pixmap(dimensions)
         if not pixmap.isNull():
             size.setWidth(pixmap.width())
             size.setHeight(pixmap.height())
         return pixmap
 
     @staticmethod
-    def _windows_pixmap(target: str, dimensions: QSize) -> QPixmap:
+    def _windows_pixmap(
+        target: str,
+        dimensions: QSize,
+        icon_index: int = 0,
+    ) -> QPixmap:
         if os.name != "nt":
             return QPixmap()
+
+        large_icon = wintypes.HICON()
+        small_icon = wintypes.HICON()
+        extracted = ctypes.windll.shell32.ExtractIconExW(
+            target,
+            icon_index,
+            ctypes.byref(large_icon),
+            ctypes.byref(small_icon),
+            1,
+        )
+        if extracted:
+            preferred = (
+                large_icon
+                if max(dimensions.width(), dimensions.height()) >= 32
+                else small_icon
+            )
+            if not preferred:
+                preferred = large_icon or small_icon
+            try:
+                if preferred:
+                    image = QImage.fromHICON(preferred.value)
+                    return QPixmap.fromImage(image).scaled(
+                        dimensions,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+            finally:
+                handles = {
+                    handle.value
+                    for handle in (large_icon, small_icon)
+                    if handle and handle.value
+                }
+                for handle in handles:
+                    ctypes.windll.user32.DestroyIcon(handle)
 
         class SHFILEINFO(ctypes.Structure):
             _fields_ = [
