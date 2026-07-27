@@ -13,6 +13,7 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.preferredHeight: 44
             Column {
                 spacing: 3
                 Text {
@@ -44,14 +45,16 @@ Item {
             }
         }
 
-        RowLayout {
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 14
 
             GlassPanel {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.right: sidePanel.left
+                anchors.rightMargin: 14
+                anchors.bottom: parent.bottom
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -204,8 +207,11 @@ Item {
             }
 
             ColumnLayout {
-                Layout.preferredWidth: 286
-                Layout.fillHeight: true
+                id: sidePanel
+                width: 286
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
                 spacing: 14
 
                 GlassPanel {
