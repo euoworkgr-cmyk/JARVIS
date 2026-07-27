@@ -9,4 +9,7 @@ tools/whisper.cpp/
 .desktop_build/
 .personal_build/
 .desktop_dist/
+.desktop_onedir/
+.desktop_onedir_build/
+dist/JARVIS-Personal/
 notes.json
