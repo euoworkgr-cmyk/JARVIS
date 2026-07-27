@@ -77,6 +77,15 @@ class PersonalAppTests(unittest.TestCase):
         self.assertEqual(items[0]["name"], "OBS Studio")
         self.assertEqual(items[0]["launchLabel"], "1 запуск")
 
+    def test_quick_launch_uses_compact_titles_that_fit_cards(self) -> None:
+        root = Path(__file__).resolve().parent
+        backend = DesktopBackend(root)
+
+        self.assertEqual(
+            [item["title"] for item in backend.presetItems],
+            ["Яндекс Браузер", "ChatGPT", "VS Code", "Telegram", "Камера"],
+        )
+
     def test_storage_values_use_compact_russian_units(self) -> None:
         self.assertEqual(_format_bytes(238 * 1024**3), "238 ГБ")
         self.assertEqual(_format_bytes(int(1.5 * 1024**4)), "1,5 ТБ")

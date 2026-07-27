@@ -50,7 +50,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: 58
+            height: 54
             color: PersonalTheme.backgroundDeep
             radius: window.visibility === Window.Maximized ? 0 : PersonalTheme.radiusLarge
 
@@ -64,13 +64,13 @@ ApplicationWindow {
 
             Row {
                 anchors.left: parent.left
-                anchors.leftMargin: 20
+                anchors.leftMargin: 18
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 12
+                spacing: 10
 
                 Item {
-                    width: 30
-                    height: 30
+                    width: 28
+                    height: 28
                     Canvas {
                         anchors.fill: parent
                         antialiasing: true
@@ -78,36 +78,26 @@ ApplicationWindow {
                             const context = getContext("2d")
                             context.reset()
                             context.strokeStyle = PersonalTheme.accent
-                            context.lineWidth = 1.6
+                            context.lineWidth = 1.5
                             context.beginPath()
-                            context.moveTo(8, 23)
-                            context.bezierCurveTo(8, 11, 14, 5, 24, 4)
-                            context.bezierCurveTo(24, 15, 19, 23, 8, 23)
+                            context.moveTo(7, 23)
+                            context.bezierCurveTo(7, 11, 13, 5, 23, 3)
+                            context.bezierCurveTo(23, 14, 18, 22, 7, 23)
                             context.stroke()
                             context.beginPath()
-                            context.moveTo(9, 23)
-                            context.lineTo(22, 7)
+                            context.moveTo(8, 23)
+                            context.lineTo(21, 6)
                             context.stroke()
                         }
                     }
                 }
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 1
                     Text {
-                        text: "JARVIS"
+                        text: "Голосовой помощник"
                         color: PersonalTheme.text
                         font.family: PersonalTheme.bodyFont
                         font.pixelSize: 13
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: 0.5
-                    }
-                    Text {
-                        text: "PERSONAL"
-                        color: PersonalTheme.accent
-                        font.family: PersonalTheme.utilityFont
-                        font.pixelSize: 8
-                        font.letterSpacing: 1.2
                     }
                 }
             }
@@ -176,7 +166,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.top: titleBar.bottom
             anchors.bottom: parent.bottom
-            width: 194
+            width: 188
             color: PersonalTheme.sidebar
 
             Rectangle {
@@ -190,55 +180,35 @@ ApplicationWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.top: parent.top
-                anchors.topMargin: 20
-                spacing: 8
+                anchors.topMargin: 28
+                spacing: 10
 
                 PersonalNavButton {
-                    symbol: "⌂"
+                    iconName: "home"
                     label: "Главная"
                     selected: backend.currentPage === "home"
                     onClicked: backend.setPage("home")
                 }
                 PersonalNavButton {
-                    symbol: "▥"
+                    iconName: "statistics"
                     label: "Статистика"
                     selected: backend.currentPage === "statistics"
                     onClicked: backend.setPage("statistics")
                 }
                 PersonalNavButton {
-                    symbol: "◌"
+                    iconName: "customization"
                     label: "Кастомизация"
                     selected: backend.currentPage === "customization"
                     onClicked: backend.setPage("customization")
                 }
                 PersonalNavButton {
-                    symbol: "⚙"
+                    iconName: "settings"
                     label: "Настройки"
                     selected: backend.currentPage === "settings"
                     onClicked: backend.setPage("settings")
                 }
             }
 
-            Row {
-                anchors.left: parent.left
-                anchors.leftMargin: 22
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 20
-                spacing: 8
-                Rectangle {
-                    width: 7
-                    height: 7
-                    radius: 4
-                    color: PersonalTheme.success
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Text {
-                    text: "Локально · без аккаунта"
-                    color: PersonalTheme.subtle
-                    font.family: PersonalTheme.bodyFont
-                    font.pixelSize: 10
-                }
-            }
         }
 
         StackLayout {
@@ -246,10 +216,10 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.top: titleBar.bottom
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 38
-            anchors.rightMargin: 38
-            anchors.topMargin: 22
-            anchors.bottomMargin: 22
+            anchors.leftMargin: 30
+            anchors.rightMargin: 30
+            anchors.topMargin: 20
+            anchors.bottomMargin: 20
             currentIndex: backend.currentPage === "statistics" ? 1
                         : backend.currentPage === "customization" ? 2
                         : backend.currentPage === "settings" ? 3 : 0

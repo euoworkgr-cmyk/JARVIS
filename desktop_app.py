@@ -4,17 +4,44 @@ import os
 from pathlib import Path
 import sys
 
-from PySide6.QtCore import QIODevice, QObject, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QIcon, QWindow
+from PySide6.QtCore import QFileInfo, QIODevice, QObject, QSize, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QIcon, QPixmap, QWindow
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
-from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
+from PySide6.QtQuick import QQuickImageProvider, QQuickWindow, QSGRendererInterface
+from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu, QSystemTrayIcon
 
 from desktop_backend import DesktopBackend
 
 
 INSTANCE_NAME = "JARVIS.Desktop.Instance"
+
+
+class ProgramIconProvider(QQuickImageProvider):
+    """Expose native Windows program icons to QML without writing cache files."""
+
+    def __init__(self, backend: DesktopBackend) -> None:
+        super().__init__(QQuickImageProvider.ImageType.Pixmap)
+        self.backend = backend
+        self.file_icons = QFileIconProvider()
+
+    def requestPixmap(
+        self,
+        identifier: str,
+        size: QSize,
+        requested_size: QSize,
+    ) -> QPixmap:
+        target = self.backend.preset_icon_target(identifier)
+        if target is None:
+            return QPixmap()
+
+        icon = self.file_icons.icon(QFileInfo(target))
+        dimensions = requested_size if requested_size.isValid() else QSize(32, 32)
+        pixmap = icon.pixmap(dimensions)
+        if not pixmap.isNull():
+            size.setWidth(pixmap.width())
+            size.setHeight(pixmap.height())
+        return pixmap
 
 
 def resource_directory() -> Path:
@@ -129,6 +156,7 @@ def run_desktop_app(
     backend = DesktopBackend(resources)
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("backend", backend)
+    engine.addImageProvider("programicons", ProgramIconProvider(backend))
     engine.load(QUrl.fromLocalFile(str(resources / "qml" / main_qml)))
     if load_pet:
         engine.load(QUrl.fromLocalFile(str(resources / "qml" / "Pet.qml")))

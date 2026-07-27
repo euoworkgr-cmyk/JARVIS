@@ -19,6 +19,23 @@ from command_service import CommandOutcome, CommandService, NotesStore
 from desktop_pet import WINDOW_SIZE, Point, clamp_position, default_position, get_work_areas, load_position, pet_state_path, save_position
 
 
+PRESET_DISPLAY_TITLES = {
+    "1": "Яндекс Браузер",
+    "2": "ChatGPT",
+    "3": "VS Code",
+    "4": "Telegram",
+    "5": "Камера",
+}
+
+PRESET_ICON_NAMES = {
+    "1": ("Яндекс", "Yandex"),
+    "2": ("ChatGPT", "Codex"),
+    "3": ("Visual Studio Code", "VS Code"),
+    "4": ("Telegram",),
+    "5": ("Камера", "Camera"),
+}
+
+
 def reduced_motion_enabled() -> bool:
     if assistant.os.name != "nt":
         return False
@@ -120,14 +137,14 @@ def collect_system_snapshot() -> dict[str, Any]:
     return {
         "resources": {
             "cpu": {
-                "label": "ЦП",
+                "label": "CPU",
                 "percent": cpu_percent,
                 "detail": cpu_detail,
                 "available": True,
             },
-            "gpu": {"label": "Видеокарта", **_gpu_snapshot()},
+            "gpu": {"label": "GPU", **_gpu_snapshot()},
             "memory": {
-                "label": "Оперативная память",
+                "label": "RAM",
                 "percent": round(memory.percent),
                 "detail": f"{_format_bytes(memory.used)} / {_format_bytes(memory.total)}",
                 "available": True,
@@ -197,21 +214,22 @@ class DesktopBackend(QObject):
         self._pet_visible = True
         self._quitting = False
         self._reduced_motion = reduced_motion_enabled()
+        self._preset_icon_targets: dict[str, str | None] = {}
         self._system_stats: dict[str, Any] = {
             "cpu": {
-                "label": "ЦП",
+                "label": "CPU",
                 "percent": 0,
                 "detail": "Ожидание",
                 "available": True,
             },
             "gpu": {
-                "label": "Видеокарта",
+                "label": "GPU",
                 "percent": 0,
                 "detail": "Ожидание",
                 "available": False,
             },
             "memory": {
-                "label": "Оперативная память",
+                "label": "RAM",
                 "percent": 0,
                 "detail": "Ожидание",
                 "available": True,
@@ -263,12 +281,84 @@ class DesktopBackend(QObject):
         return [
             {
                 "number": number,
-                "title": title,
+                "title": PRESET_DISPLAY_TITLES.get(number, title),
                 "program": str(program_name or "yandex browser"),
-                "monogram": self._program_monogram(title),
+                "monogram": self._program_monogram(
+                    PRESET_DISPLAY_TITLES.get(number, title)
+                ),
             }
             for number, (title, program_name) in assistant.PRESET_COMMANDS.items()
         ]
+
+    def preset_icon_target(self, number: str) -> str | None:
+        if number in self._preset_icon_targets:
+            return self._preset_icon_targets[number]
+
+        preset = assistant.PRESET_COMMANDS.get(number)
+        if preset is None:
+            self._preset_icon_targets[number] = None
+            return None
+
+        _title, program_name = preset
+        candidates: list[Path] = []
+        if number == "1":
+            candidates.append(assistant.YANDEX_BROWSER_EXECUTABLE)
+
+        target = self.service.program_map.get(str(program_name or "yandex browser"), "")
+        expanded_target = Path(os.path.expandvars(target)) if target else None
+        if expanded_target is not None and expanded_target.is_file():
+            candidates.append(expanded_target)
+
+        local_app_data = Path(os.environ.get("LOCALAPPDATA", ""))
+        roaming_app_data = Path(os.environ.get("APPDATA", ""))
+        program_files = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+        candidates.extend(
+            {
+                "2": [
+                    local_app_data / "Programs" / "ChatGPT" / "ChatGPT.exe",
+                    local_app_data / "Microsoft" / "WindowsApps" / "ChatGPT.exe",
+                ],
+                "3": [
+                    local_app_data / "Programs" / "Microsoft VS Code" / "Code.exe",
+                    program_files / "Microsoft VS Code" / "Code.exe",
+                ],
+                "4": [
+                    roaming_app_data / "Telegram Desktop" / "Telegram.exe",
+                    local_app_data / "Telegram Desktop" / "Telegram.exe",
+                ],
+            }.get(number, [])
+        )
+
+        result = next((str(candidate) for candidate in candidates if candidate.is_file()), None)
+        if result is not None:
+            self._preset_icon_targets[number] = result
+            return result
+
+        start_menu_roots = [
+            roaming_app_data / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+            Path(os.environ.get("ProgramData", r"C:\ProgramData"))
+            / "Microsoft"
+            / "Windows"
+            / "Start Menu"
+            / "Programs",
+        ]
+        names = tuple(name.casefold() for name in PRESET_ICON_NAMES.get(number, ()))
+        for start_menu in start_menu_roots:
+            if not start_menu.is_dir():
+                continue
+            try:
+                shortcuts = start_menu.rglob("*.lnk")
+                candidates.extend(
+                    shortcut
+                    for shortcut in shortcuts
+                    if any(name in shortcut.stem.casefold() for name in names)
+                )
+            except OSError:
+                continue
+
+        result = next((str(candidate) for candidate in candidates if candidate.is_file()), None)
+        self._preset_icon_targets[number] = result
+        return result
 
     @Property("QVariantList", constant=True)
     def protocolItems(self) -> list[dict[str, Any]]:
@@ -335,7 +425,7 @@ class DesktopBackend(QObject):
                 "monogram": self._program_monogram(display_names[key]),
                 "bars": self._usage_bars(key, count),
             }
-            for key, count in counts.most_common(5)
+            for key, count in counts.most_common(4)
         ]
 
     @Property("QVariantMap", notify=systemStatsChanged)

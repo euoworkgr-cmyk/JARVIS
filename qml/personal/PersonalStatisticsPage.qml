@@ -15,179 +15,146 @@ Item {
     }
 
     Flickable {
+        id: pageFlickable
         anchors.fill: parent
-        contentWidth: width
-        contentHeight: pageColumn.implicitHeight + 40
+        contentWidth: pageColumn.width
+        contentHeight: pageColumn.implicitHeight + 12
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: PersonalScrollBar { policy: ScrollBar.AsNeeded }
 
         ColumnLayout {
             id: pageColumn
-            width: parent.width
-            spacing: 22
+            width: Math.max(0, pageFlickable.width - 14)
+            spacing: 18
 
-            RowLayout {
-                Layout.fillWidth: true
-
-                ColumnLayout {
-                    spacing: 4
-                    Text {
-                        text: "Статистика"
-                        color: PersonalTheme.text
-                        font.family: PersonalTheme.displayFont
-                        font.pixelSize: 34
-                    }
-                    Text {
-                        text: "Привычки запуска и состояние компьютера"
-                        color: PersonalTheme.muted
-                        font.family: PersonalTheme.bodyFont
-                        font.pixelSize: 12
-                    }
-                }
-                Item { Layout.fillWidth: true }
-                Rectangle {
-                    width: 144
-                    height: 34
-                    radius: PersonalTheme.radiusSmall
-                    color: refreshHover.hovered ? PersonalTheme.surfaceHover : PersonalTheme.surface
-                    border.width: 1
-                    border.color: PersonalTheme.border
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Обновить статистику"
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 8
-                        Text {
-                            text: "↻"
-                            color: PersonalTheme.accent
-                            font.pixelSize: 17
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            text: backend.statsUpdatedLabel
-                            color: PersonalTheme.muted
-                            font.family: PersonalTheme.bodyFont
-                            font.pixelSize: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                    }
-                    HoverHandler { id: refreshHover }
-                    TapHandler { onTapped: backend.refreshSystemStats() }
-                }
+            Text {
+                text: "Часто используемые"
+                color: PersonalTheme.text
+                font.family: PersonalTheme.bodyFont
+                font.pixelSize: 17
+                font.weight: Font.Medium
             }
 
-            ColumnLayout {
+            PersonalPanel {
+                visible: backend.frequentPrograms.length === 0
                 Layout.fillWidth: true
-                spacing: 12
+                Layout.preferredHeight: 86
 
                 Text {
-                    text: "Часто используемые"
-                    color: PersonalTheme.text
-                    font.family: PersonalTheme.bodyFont
-                    font.pixelSize: 17
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    visible: backend.frequentPrograms.length === 0
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 88
+                    anchors.fill: parent
+                    anchors.margins: 18
                     text: "Здесь появятся программы, которые вы запускаете через ассистента.\nПриложения из быстрого запуска не учитываются."
                     color: PersonalTheme.muted
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
                     font.family: PersonalTheme.bodyFont
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                 }
+            }
 
-                GridLayout {
-                    visible: backend.frequentPrograms.length > 0
-                    Layout.fillWidth: true
-                    columns: Math.min(5, backend.frequentPrograms.length)
-                    columnSpacing: 12
+            GridLayout {
+                visible: backend.frequentPrograms.length > 0
+                Layout.fillWidth: true
+                columns: Math.min(4, backend.frequentPrograms.length)
+                columnSpacing: 12
 
-                    Repeater {
-                        model: backend.frequentPrograms
+                Repeater {
+                    model: backend.frequentPrograms
 
-                        PersonalPanel {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 184
+                    PersonalPanel {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        Layout.preferredWidth: 1
+                        Layout.preferredHeight: 184
 
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 8
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 7
 
-                                Rectangle {
-                                    width: 38
-                                    height: 38
-                                    radius: 10
-                                    color: PersonalTheme.surfaceRaised
-                                    border.width: 1
-                                    border.color: PersonalTheme.border
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.monogram
-                                        color: PersonalTheme.accent
-                                        font.family: PersonalTheme.utilityFont
-                                        font.pixelSize: 11
-                                        font.weight: Font.DemiBold
-                                    }
-                                }
+                            Rectangle {
+                                Layout.preferredWidth: 38
+                                Layout.preferredHeight: 38
+                                radius: 10
+                                color: PersonalTheme.accentGhost
+                                border.width: 1
+                                border.color: PersonalTheme.accentMuted
+
                                 Text {
-                                    Layout.fillWidth: true
-                                    text: modelData.name
-                                    color: PersonalTheme.text
-                                    elide: Text.ElideRight
-                                    font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: 12
+                                    anchors.centerIn: parent
+                                    text: modelData.monogram
+                                    color: PersonalTheme.accent
+                                    font.family: PersonalTheme.utilityFont
+                                    font.pixelSize: 10
                                     font.weight: Font.DemiBold
                                 }
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: modelData.name
+                                color: PersonalTheme.text
+                                elide: Text.ElideRight
+                                font.family: PersonalTheme.bodyFont
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            Text {
+                                text: modelData.launchLabel
+                                color: PersonalTheme.muted
+                                font.family: PersonalTheme.bodyFont
+                                font.pixelSize: 10
+                            }
+
+                            Row {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 30
+                                spacing: 3
+
+                                Repeater {
+                                    model: modelData.bars
+
+                                    Rectangle {
+                                        required property real modelData
+                                        width: 4
+                                        height: Math.max(5, 28 * modelData)
+                                        radius: 2
+                                        color: PersonalTheme.accentMuted
+                                        anchors.bottom: parent.bottom
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillHeight: true }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 30
+                                radius: 7
+                                color: programTap.pressed || programHover.hovered
+                                       ? PersonalTheme.accentMuted : PersonalTheme.surfaceHover
+                                border.width: 1
+                                border.color: PersonalTheme.borderStrong
+                                Accessible.role: Accessible.Button
+                                Accessible.name: "Запустить " + modelData.name
+
                                 Text {
-                                    text: modelData.launchLabel
-                                    color: PersonalTheme.muted
+                                    anchors.centerIn: parent
+                                    text: "Запустить"
+                                    color: PersonalTheme.text
                                     font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: 10
+                                    font.pixelSize: 11
                                 }
-                                Row {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 30
-                                    spacing: 3
-                                    Repeater {
-                                        model: modelData.bars
-                                        Rectangle {
-                                            required property real modelData
-                                            width: 4
-                                            height: Math.max(5, 28 * modelData)
-                                            radius: 2
-                                            color: PersonalTheme.accentMuted
-                                            anchors.bottom: parent.bottom
-                                        }
-                                    }
-                                }
-                                Item { Layout.fillHeight: true }
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 30
-                                    radius: 7
-                                    color: programHover.hovered ? PersonalTheme.accentMuted : PersonalTheme.surfaceHover
-                                    border.width: 1
-                                    border.color: PersonalTheme.borderStrong
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Запустить"
-                                        color: PersonalTheme.text
-                                        font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 11
-                                    }
-                                    HoverHandler { id: programHover }
-                                    TapHandler {
-                                        enabled: !backend.busy
-                                        onTapped: backend.launchProgram(modelData.command)
-                                    }
+
+                                HoverHandler { id: programHover }
+                                TapHandler {
+                                    id: programTap
+                                    enabled: !backend.busy
+                                    onTapped: backend.launchProgram(modelData.command)
                                 }
                             }
                         }
@@ -201,130 +168,92 @@ Item {
                 color: PersonalTheme.border
             }
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 12
-
-                Text {
-                    text: "Состояние системы"
-                    color: PersonalTheme.text
-                    font.family: PersonalTheme.bodyFont
-                    font.pixelSize: 17
-                    font.weight: Font.DemiBold
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
-
-                    Repeater {
-                        model: root.resourceItems()
-
-                        PersonalPanel {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 118
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 8
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text {
-                                        text: modelData.label
-                                        color: PersonalTheme.muted
-                                        font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 11
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                    Text {
-                                        text: modelData.available === false ? "—" : modelData.percent + "%"
-                                        color: PersonalTheme.text
-                                        font.family: PersonalTheme.utilityFont
-                                        font.pixelSize: 24
-                                    }
-                                }
-                                Text {
-                                    text: modelData.detail
-                                    color: PersonalTheme.subtle
-                                    font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: 10
-                                }
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 5
-                                    radius: 3
-                                    color: PersonalTheme.backgroundDeep
-                                    Rectangle {
-                                        width: parent.width * Math.max(0, Math.min(100, modelData.percent)) / 100
-                                        height: parent.height
-                                        radius: parent.radius
-                                        color: PersonalTheme.accent
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            Text {
+                text: "Состояние системы"
+                color: PersonalTheme.text
+                font.family: PersonalTheme.bodyFont
+                font.pixelSize: 17
+                font.weight: Font.Medium
             }
 
-            ColumnLayout {
+            RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
 
-                Text {
-                    text: "Диски"
-                    color: PersonalTheme.text
-                    font.family: PersonalTheme.bodyFont
-                    font.pixelSize: 17
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    visible: backend.diskItems.length === 0
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 54
-                    text: "Данные о дисках появятся после обновления."
-                    color: PersonalTheme.muted
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    font.family: PersonalTheme.bodyFont
-                    font.pixelSize: 11
-                }
-
                 Repeater {
-                    model: backend.diskItems
+                    model: root.resourceItems()
 
                     PersonalPanel {
                         required property var modelData
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 56
+                        Layout.minimumWidth: 0
+                        Layout.preferredWidth: 1
+                        Layout.preferredHeight: 112
 
-                        RowLayout {
+                        ColumnLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 16
-                            anchors.rightMargin: 16
-                            spacing: 14
+                            anchors.margins: 14
+                            spacing: 7
 
-                            Text {
-                                text: "▱"
-                                color: PersonalTheme.accent
-                                font.pixelSize: 20
+                            RowLayout {
+                                Layout.fillWidth: true
+
+                                ColumnLayout {
+                                    spacing: 2
+
+                                    Text {
+                                        text: modelData.label
+                                        color: PersonalTheme.text
+                                        font.family: PersonalTheme.bodyFont
+                                        font.pixelSize: 13
+                                        font.weight: Font.Medium
+                                    }
+
+                                    Text {
+                                        text: modelData.available === false ? "—" : modelData.percent + "%"
+                                        color: PersonalTheme.text
+                                        font.family: PersonalTheme.utilityFont
+                                        font.pixelSize: 23
+                                    }
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Canvas {
+                                    Layout.preferredWidth: 92
+                                    Layout.preferredHeight: 34
+                                    antialiasing: true
+                                    property real value: Number(modelData.percent || 0)
+                                    onValueChanged: requestPaint()
+                                    Component.onCompleted: requestPaint()
+
+                                    onPaint: {
+                                        const context = getContext("2d")
+                                        context.reset()
+                                        context.strokeStyle = PersonalTheme.accentMuted
+                                        context.lineWidth = 1.25
+                                        context.beginPath()
+                                        for (let point = 0; point < 14; point++) {
+                                            const x = point * width / 13
+                                            const phase = value * 0.07 + point * 1.7
+                                            const pulse = Math.sin(phase) * 4 + Math.cos(phase * 0.61) * 3
+                                            const y = height * 0.54 - pulse
+                                            if (point === 0)
+                                                context.moveTo(x, y)
+                                            else
+                                                context.lineTo(x, y)
+                                        }
+                                        context.stroke()
+                                    }
+                                }
                             }
-                            Text {
-                                text: modelData.name
-                                color: PersonalTheme.text
-                                font.family: PersonalTheme.utilityFont
-                                font.pixelSize: 12
-                                Layout.preferredWidth: 54
-                            }
+
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 6
                                 radius: 3
                                 color: PersonalTheme.backgroundDeep
+
                                 Rectangle {
                                     width: parent.width * Math.max(0, Math.min(100, modelData.percent)) / 100
                                     height: parent.height
@@ -332,25 +261,123 @@ Item {
                                     color: PersonalTheme.accent
                                 }
                             }
-                            Text {
-                                text: modelData.detail
-                                color: PersonalTheme.muted
-                                horizontalAlignment: Text.AlignRight
-                                font.family: PersonalTheme.utilityFont
-                                font.pixelSize: 10
-                                Layout.preferredWidth: 150
-                            }
-                            Text {
-                                text: modelData.percent + "%"
-                                color: PersonalTheme.text
-                                horizontalAlignment: Text.AlignRight
-                                font.family: PersonalTheme.utilityFont
-                                font.pixelSize: 10
-                                Layout.preferredWidth: 38
-                            }
                         }
                     }
                 }
+            }
+
+            Text {
+                text: "Диски"
+                color: PersonalTheme.text
+                font.family: PersonalTheme.bodyFont
+                font.pixelSize: 17
+                font.weight: Font.Medium
+            }
+
+            Text {
+                visible: backend.diskItems.length === 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: 54
+                text: "Данные о дисках появятся после обновления."
+                color: PersonalTheme.muted
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                font.family: PersonalTheme.bodyFont
+                font.pixelSize: 11
+            }
+
+            Repeater {
+                model: backend.diskItems
+
+                PersonalPanel {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 56
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 16
+                        spacing: 12
+
+                        Text {
+                            text: "▱"
+                            color: PersonalTheme.accent
+                            font.pixelSize: 19
+                        }
+
+                        Text {
+                            text: modelData.name
+                            color: PersonalTheme.text
+                            font.family: PersonalTheme.utilityFont
+                            font.pixelSize: 12
+                            Layout.preferredWidth: 44
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 6
+                            radius: 3
+                            color: PersonalTheme.backgroundDeep
+
+                            Rectangle {
+                                width: parent.width * Math.max(0, Math.min(100, modelData.percent)) / 100
+                                height: parent.height
+                                radius: parent.radius
+                                color: PersonalTheme.accent
+                            }
+                        }
+
+                        Text {
+                            text: modelData.detail
+                            color: PersonalTheme.muted
+                            horizontalAlignment: Text.AlignRight
+                            font.family: PersonalTheme.utilityFont
+                            font.pixelSize: 10
+                            Layout.preferredWidth: 148
+                        }
+
+                        Text {
+                            text: modelData.percent + "%"
+                            color: PersonalTheme.text
+                            horizontalAlignment: Text.AlignRight
+                            font.family: PersonalTheme.utilityFont
+                            font.pixelSize: 10
+                            Layout.preferredWidth: 34
+                        }
+                    }
+                }
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 26
+                Accessible.role: Accessible.Button
+                Accessible.name: "Обновить статистику"
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 7
+
+                    Text {
+                        text: "↻"
+                        color: refreshHover.hovered ? PersonalTheme.accentBright : PersonalTheme.accent
+                        font.pixelSize: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                        text: backend.statsUpdatedLabel
+                        color: refreshHover.hovered ? PersonalTheme.text : PersonalTheme.muted
+                        font.family: PersonalTheme.bodyFont
+                        font.pixelSize: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                HoverHandler { id: refreshHover }
+                TapHandler { onTapped: backend.refreshSystemStats() }
             }
         }
     }
