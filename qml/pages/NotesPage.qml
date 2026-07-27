@@ -86,8 +86,8 @@ Item {
                     enabled: newNote.text.trim().length > 0
                     accessibleName: "Добавить заметку"
                     onClicked: {
-                        backend.addNote(newNote.text)
-                        newNote.text = ""
+                        if (backend.addNote(newNote.text))
+                            newNote.text = ""
                     }
                 }
             }
@@ -225,8 +225,8 @@ Item {
                                 implicitHeight: 34
                                 enabled: editField.text.trim().length > 0
                                 onClicked: {
-                                    backend.updateNote(modelData.index, editField.text)
-                                    noteCard.editing = false
+                                    if (backend.updateNote(modelData.index, editField.text))
+                                        noteCard.editing = false
                                 }
                             }
                         }
@@ -309,8 +309,8 @@ Item {
                     text: "Очистить"
                     danger: true
                     onClicked: {
-                        backend.clearNotes()
-                        clearNotesPopup.close()
+                        if (backend.clearNotes())
+                            clearNotesPopup.close()
                     }
                 }
             }

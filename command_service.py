@@ -87,16 +87,19 @@ class JsonListStore:
         except OSError:
             pass
 
-    def save(self) -> None:
+    def _save_items(self, items: list[Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        items = self.items[-self.limit :] if self.limit else self.items
+        stored_items = list(items[-self.limit :] if self.limit else items)
         temporary = self.path.with_suffix(f"{self.path.suffix}.tmp")
         temporary.write_text(
-            json.dumps(items, ensure_ascii=False, indent=2),
+            json.dumps(stored_items, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         temporary.replace(self.path)
-        self.items = list(items)
+        self.items = stored_items
+
+    def save(self) -> None:
+        self._save_items(list(self.items))
 
 
 class HistoryStore(JsonListStore):
@@ -120,35 +123,33 @@ class HistoryStore(JsonListStore):
             "title": outcome.title,
             "detail": outcome.detail,
         }
-        self.items.append(entry)
-        self.save()
+        self._save_items([*self.items, entry])
         return entry
 
     def update(self, entry_id: str, outcome: CommandOutcome) -> None:
-        for entry in self.items:
+        updated_items = list(self.items)
+        for index, entry in enumerate(updated_items):
             if entry.get("id") == entry_id:
-                entry.update(
-                    {
-                        "timestamp": _timestamp(),
-                        "status": outcome.status,
-                        "title": outcome.title,
-                        "detail": outcome.detail,
-                    }
-                )
-                self.save()
+                updated_items[index] = {
+                    **entry,
+                    "timestamp": _timestamp(),
+                    "status": outcome.status,
+                    "title": outcome.title,
+                    "detail": outcome.detail,
+                }
+                self._save_items(updated_items)
                 return
 
     def remove(self, entry_id: str) -> bool:
         previous_length = len(self.items)
-        self.items = [item for item in self.items if item.get("id") != entry_id]
-        if len(self.items) == previous_length:
+        updated_items = [item for item in self.items if item.get("id") != entry_id]
+        if len(updated_items) == previous_length:
             return False
-        self.save()
+        self._save_items(updated_items)
         return True
 
     def clear(self) -> None:
-        self.items.clear()
-        self.save()
+        self._save_items([])
 
 
 class NotesStore(JsonListStore):
@@ -210,8 +211,7 @@ class NotesStore(JsonListStore):
                         migrated.append(value)
 
         if migrated:
-            self.items = migrated
-            self.save()
+            self._save_items(migrated)
 
         if self.items or migrated:
             try:
@@ -223,28 +223,28 @@ class NotesStore(JsonListStore):
     def add(self, text: str) -> list[str]:
         value = text.strip()
         if value:
-            self.items.append(value)
-            self.save()
+            self._save_items([*self.items, value])
         return list(self.items)
 
     def update(self, index: int, text: str) -> list[str]:
         value = text.strip()
         if not value or not 0 <= index < len(self.items):
             raise ValueError("Не удалось изменить заметку.")
-        self.items[index] = value
-        self.save()
+        updated_items = list(self.items)
+        updated_items[index] = value
+        self._save_items(updated_items)
         return list(self.items)
 
     def remove(self, index: int) -> list[str]:
         if not 0 <= index < len(self.items):
             raise ValueError("Заметка не найдена.")
-        self.items.pop(index)
-        self.save()
+        updated_items = list(self.items)
+        updated_items.pop(index)
+        self._save_items(updated_items)
         return list(self.items)
 
     def clear(self) -> list[str]:
-        self.items.clear()
-        self.save()
+        self._save_items([])
         return []
 
 

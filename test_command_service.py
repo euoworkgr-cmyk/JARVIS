@@ -76,6 +76,28 @@ class NotesStoreTests(unittest.TestCase):
 
             self.assertEqual(notes.items, [])
 
+    def test_failed_writes_leave_notes_unchanged(self) -> None:
+        operations = (
+            lambda store: store.add("Новая"),
+            lambda store: store.update(0, "Изменённая"),
+            lambda store: store.remove(0),
+            lambda store: store.clear(),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for number, operation in enumerate(operations):
+                with self.subTest(operation=number):
+                    store = NotesStore(
+                        Path(directory) / f"notes-{number}.json",
+                        legacy_path=Path(directory) / "missing.json",
+                    )
+                    store.items = ["Первая", "Вторая"]
+                    with (
+                        patch("command_service.Path.write_text", side_effect=OSError("disk full")),
+                        self.assertRaises(OSError),
+                    ):
+                        operation(store)
+                    self.assertEqual(store.items, ["Первая", "Вторая"])
+
 
 class CommandServiceTests(unittest.TestCase):
     def make_service(self, path: Path) -> CommandService:

@@ -332,27 +332,29 @@ class DesktopBackend(QObject):
     def activateGameMode(self) -> None:
         self.executeCommand("/game")
 
-    @Slot(str)
-    def addNote(self, text: str) -> None:
+    @Slot(str, result=bool)
+    def addNote(self, text: str) -> bool:
         try:
             self.notes_store.add(text)
         except OSError as error:
             self._handle_outcome(CommandOutcome("error", "Не удалось сохранить заметку", str(error)))
-            return
+            return False
         self.notesChanged.emit()
         self._set_message(CommandOutcome("success", "Заметка добавлена"))
         self._set_state("success", restore=True)
+        return True
 
-    @Slot(int, str)
-    def updateNote(self, index: int, text: str) -> None:
+    @Slot(int, str, result=bool)
+    def updateNote(self, index: int, text: str) -> bool:
         try:
             self.notes_store.update(index, text)
         except (OSError, ValueError) as error:
             self._handle_outcome(CommandOutcome("error", "Не удалось изменить заметку", str(error)))
-            return
+            return False
         self.notesChanged.emit()
         self._set_message(CommandOutcome("success", "Заметка изменена"))
         self._set_state("success", restore=True)
+        return True
 
     @Slot(int)
     def removeNote(self, index: int) -> None:
@@ -364,15 +366,16 @@ class DesktopBackend(QObject):
         self.notesChanged.emit()
         self._set_message(CommandOutcome("success", "Заметка удалена"))
 
-    @Slot()
-    def clearNotes(self) -> None:
+    @Slot(result=bool)
+    def clearNotes(self) -> bool:
         try:
             self.notes_store.clear()
         except OSError as error:
             self._handle_outcome(CommandOutcome("error", "Не удалось очистить заметки", str(error)))
-            return
+            return False
         self.notesChanged.emit()
         self._set_message(CommandOutcome("success", "Заметки очищены"))
+        return True
 
     @Slot(int, int)
     def savePetPosition(self, x: int, y: int) -> None:
