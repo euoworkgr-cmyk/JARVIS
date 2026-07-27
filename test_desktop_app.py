@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtGui import QWindow
 from PySide6.QtQuick import QQuickWindow
 from PySide6.QtWidgets import QApplication
 
@@ -21,23 +22,37 @@ class DesktopAppSmokeTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_main_qml_loads_without_errors(self) -> None:
+    def test_desktop_windows_load_without_transient_relationship(self) -> None:
         root = Path(__file__).resolve().parent
         engine = QQmlApplicationEngine()
         backend = DesktopBackend(root)
         engine.rootContext().setContextProperty("backend", backend)
 
         engine.load(QUrl.fromLocalFile(str(root / "qml" / "Main.qml")))
+        engine.load(QUrl.fromLocalFile(str(root / "qml" / "Pet.qml")))
 
-        self.assertEqual(len(engine.rootObjects()), 1)
-        window = engine.rootObjects()[0]
-        self.assertEqual(window.title(), "JARVIS Desktop")
-        self.assertEqual(window.color().alpha(), 255)
-        pet_window = window.findChild(QQuickWindow, "petWindow")
-        self.assertIsNotNone(pet_window)
+        windows = {
+            window.title(): window
+            for window in engine.rootObjects()
+            if isinstance(window, QQuickWindow)
+        }
+        self.assertEqual(set(windows), {"JARVIS Desktop", "JARVIS Pet"})
+        main_window = windows["JARVIS Desktop"]
+        pet_window = windows["JARVIS Pet"]
+        self.assertEqual(main_window.color().alpha(), 255)
         self.assertIsNone(pet_window.transientParent())
+
+        main_window.show()
+        pet_window.show()
+        self.app.processEvents()
+        main_window.showMinimized()
+        self.app.processEvents()
+
+        self.assertTrue(pet_window.isVisible())
+        self.assertNotEqual(pet_window.visibility(), QWindow.Visibility.Minimized)
         backend._quitting = True
-        window.close()
+        main_window.close()
+        pet_window.close()
 
     def test_jarvis_core_has_no_per_frame_canvas_repaint(self) -> None:
         root = Path(__file__).resolve().parent

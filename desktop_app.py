@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 import sys
 
-from PySide6.QtCore import QIODevice, QObject, QUrl, Signal
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtCore import QIODevice, QObject, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QIcon, QWindow
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
@@ -114,11 +114,26 @@ def run_desktop_app() -> int:
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("backend", backend)
     engine.load(QUrl.fromLocalFile(str(resources / "qml" / "Main.qml")))
-    if not engine.rootObjects():
+    engine.load(QUrl.fromLocalFile(str(resources / "qml" / "Pet.qml")))
+
+    root_windows = {
+        window.title(): window
+        for window in engine.rootObjects()
+        if isinstance(window, QQuickWindow)
+    }
+    main_window = root_windows.get("JARVIS Desktop")
+    pet_window = root_windows.get("JARVIS Pet")
+    if main_window is None or pet_window is None:
         return 2
 
-    main_window = engine.rootObjects()[0]
     backend.set_main_window(main_window)
+
+    def keep_pet_visible(visibility: QWindow.Visibility) -> None:
+        if visibility == QWindow.Visibility.Minimized and backend.petVisible:
+            QTimer.singleShot(0, pet_window.show)
+            QTimer.singleShot(0, pet_window.raise_)
+
+    main_window.visibilityChanged.connect(keep_pet_visible)
     single_instance.activationRequested.connect(backend.showMainWindow)
     tray = create_tray(backend, resources)
 
