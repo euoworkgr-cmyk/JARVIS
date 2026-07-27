@@ -5,4 +5,4 @@ __pycache__/
 .qmlcache/
 .desktop_build/
 .desktop_dist/
-
+notes.json
