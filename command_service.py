@@ -422,7 +422,7 @@ class CommandService:
             if action.kind == "power":
                 outcome = self._launch_outcome(assistant.execute_power_command(action.payload))
             else:
-                result = activate_game_mode(action.payload)
+                result = activate_game_mode(action.payload, force=action.kind == "kill")
                 if result.failed:
                     failed = "; ".join(f"{candidate.name}: {error}" for candidate, error in result.failed)
                     outcome = CommandOutcome(

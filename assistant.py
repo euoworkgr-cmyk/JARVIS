@@ -891,7 +891,7 @@ def run_cli() -> int:
             if not confirmed:
                 ui.message(LaunchResult("success", "Kill отменён"))
                 continue
-            ui.show_kill_result(kill_target, activate_game_mode(scan))
+            ui.show_kill_result(kill_target, activate_game_mode(scan, force=True))
             continue
         if lowered in SPECIAL_LAUNCH_COMMANDS:
             ui.message(open_special_command(lowered))

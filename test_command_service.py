@@ -128,7 +128,22 @@ class CommandServiceTests(unittest.TestCase):
             result = service.confirm(pending.data["pending_id"])
 
             self.assertEqual(result.status, "success")
-            activate_mock.assert_called_once()
+            activate_mock.assert_called_once_with(scan_mock.return_value, force=True)
+
+    @patch("command_service.activate_game_mode")
+    @patch("command_service.scan_game_mode")
+    def test_game_mode_keeps_graceful_shutdown(self, scan_mock, activate_mock) -> None:
+        candidate = ProcessCandidate(42, "chrome.exe", 10.0, 8.0, "браузер · GPU 8.0%")
+        scan_mock.return_value = GameModeScan([candidate], True)
+        activate_mock.return_value = GameModeResult([candidate], [])
+        with tempfile.TemporaryDirectory() as directory:
+            service = self.make_service(Path(directory) / "history.json")
+
+            pending = service.execute("/game")
+            result = service.confirm(pending.data["pending_id"])
+
+            self.assertEqual(result.status, "success")
+            activate_mock.assert_called_once_with(scan_mock.return_value, force=False)
 
     def test_clear_history_requires_confirmation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

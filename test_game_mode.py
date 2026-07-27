@@ -121,7 +121,7 @@ class GameModeTests(unittest.TestCase):
 
         self.assertFalse(game_mode._matches_candidate(replacement, candidate))
 
-    def test_termination_closes_owned_process_tree(self) -> None:
+    def test_forced_termination_closes_owned_process_tree(self) -> None:
         parent = subprocess.Popen(
             [
                 sys.executable,
@@ -153,7 +153,8 @@ class GameModeTests(unittest.TestCase):
 
             result = game_mode.terminate_processes(
                 [candidate],
-                kill_timeout=1.0,
+                force_timeout=1.0,
+                force=True,
             )
 
             self.assertEqual(result.failed, [])
