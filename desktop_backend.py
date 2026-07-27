@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import ctypes
+from collections import Counter
+from datetime import datetime
+import getpass
+import os
 from pathlib import Path
+import shutil
+import subprocess
 from typing import Any, Callable
 
+import psutil
 from PySide6.QtCore import Property, QObject, QRunnable, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QWindow
 
@@ -26,6 +33,109 @@ def reduced_motion_enabled() -> bool:
     except (AttributeError, OSError):
         return False
     return bool(success) and not enabled.value
+
+
+def _format_bytes(value: int) -> str:
+    amount = float(max(0, value))
+    units = ("Б", "КБ", "МБ", "ГБ", "ТБ")
+    for unit in units:
+        if amount < 1024 or unit == units[-1]:
+            digits = 0 if unit in {"Б", "КБ", "МБ"} else 1
+            return f"{amount:.{digits}f} {unit}".replace(".0 ", " ").replace(".", ",")
+        amount /= 1024
+    return f"{amount:.1f} ТБ".replace(".", ",")
+
+
+def _gpu_snapshot() -> dict[str, Any]:
+    executable = shutil.which("nvidia-smi")
+    if not executable and os.name == "nt":
+        candidate = (
+            Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+            / "NVIDIA Corporation"
+            / "NVSMI"
+            / "nvidia-smi.exe"
+        )
+        if candidate.is_file():
+            executable = str(candidate)
+    if not executable:
+        return {"percent": 0, "detail": "Нет данных", "available": False}
+    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    try:
+        completed = subprocess.run(
+            [
+                executable,
+                "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=True,
+            creationflags=creation_flags,
+        )
+        values = [part.strip() for part in completed.stdout.splitlines()[0].split(",")]
+        usage, used_memory, total_memory, temperature = (float(value) for value in values[:4])
+    except (IndexError, OSError, subprocess.SubprocessError, ValueError):
+        return {"percent": 0, "detail": "Нет данных", "available": False}
+    return {
+        "percent": round(usage),
+        "detail": (
+            f"{temperature:.0f} °C · {used_memory / 1024:.1f} / "
+            f"{total_memory / 1024:.1f} ГБ"
+        ).replace(".", ","),
+        "available": True,
+    }
+
+
+def collect_system_snapshot() -> dict[str, Any]:
+    cpu_percent = round(psutil.cpu_percent(interval=0.15))
+    frequency = psutil.cpu_freq()
+    cpu_detail = (
+        f"{frequency.current / 1000:.1f} ГГц".replace(".", ",")
+        if frequency
+        else "Активен"
+    )
+    memory = psutil.virtual_memory()
+    disks: list[dict[str, Any]] = []
+    seen_devices: set[str] = set()
+    for partition in psutil.disk_partitions(all=False):
+        device = partition.device or partition.mountpoint
+        normalized = device.casefold()
+        if normalized in seen_devices or "cdrom" in partition.opts.casefold():
+            continue
+        seen_devices.add(normalized)
+        try:
+            usage = psutil.disk_usage(partition.mountpoint)
+        except (OSError, PermissionError):
+            continue
+        disks.append(
+            {
+                "name": device.rstrip("\\/") or partition.mountpoint,
+                "percent": round(usage.percent),
+                "used": _format_bytes(usage.used),
+                "total": _format_bytes(usage.total),
+                "detail": f"{_format_bytes(usage.used)} / {_format_bytes(usage.total)}",
+            }
+        )
+    return {
+        "resources": {
+            "cpu": {
+                "label": "ЦП",
+                "percent": cpu_percent,
+                "detail": cpu_detail,
+                "available": True,
+            },
+            "gpu": {"label": "Видеокарта", **_gpu_snapshot()},
+            "memory": {
+                "label": "Оперативная память",
+                "percent": round(memory.percent),
+                "detail": f"{_format_bytes(memory.used)} / {_format_bytes(memory.total)}",
+                "available": True,
+            },
+        },
+        "disks": disks,
+        "updated": datetime.now().strftime("%H:%M:%S"),
+    }
 
 
 class WorkerSignals(QObject):
@@ -61,6 +171,7 @@ class DesktopBackend(QObject):
     petPositionChanged = Signal()
     petVisibleChanged = Signal()
     quittingChanged = Signal()
+    systemStatsChanged = Signal()
 
     showMainRequested = Signal()
     helpRequested = Signal()
@@ -86,6 +197,32 @@ class DesktopBackend(QObject):
         self._pet_visible = True
         self._quitting = False
         self._reduced_motion = reduced_motion_enabled()
+        self._system_stats: dict[str, Any] = {
+            "cpu": {
+                "label": "ЦП",
+                "percent": 0,
+                "detail": "Ожидание",
+                "available": True,
+            },
+            "gpu": {
+                "label": "Видеокарта",
+                "percent": 0,
+                "detail": "Ожидание",
+                "available": False,
+            },
+            "memory": {
+                "label": "Оперативная память",
+                "percent": 0,
+                "detail": "Ожидание",
+                "available": True,
+            },
+        }
+        self._disk_items: list[dict[str, Any]] = []
+        self._stats_updated_label = "Ожидание обновления"
+        self._stats_refreshing = False
+        self._stats_timer = QTimer(self)
+        self._stats_timer.setInterval(3000)
+        self._stats_timer.timeout.connect(self.refreshSystemStats)
 
         work_areas = get_work_areas()
         if work_areas:
@@ -115,6 +252,103 @@ class DesktopBackend(QObject):
             {"index": index, "text": text}
             for index, text in enumerate(self.notes_store.items)
         ]
+
+    @Property(str, constant=True)
+    def displayName(self) -> str:
+        value = (os.environ.get("USERNAME") or getpass.getuser() or "Пользователь").strip()
+        return value[:1].upper() + value[1:] if value else "Пользователь"
+
+    @Property("QVariantList", notify=programsChanged)
+    def presetItems(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "number": number,
+                "title": title,
+                "program": str(program_name or "yandex browser"),
+                "monogram": self._program_monogram(title),
+            }
+            for number, (title, program_name) in assistant.PRESET_COMMANDS.items()
+        ]
+
+    @Property("QVariantList", constant=True)
+    def protocolItems(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": "game_mode",
+                "title": "Игровой режим",
+                "detail": "Освободить ресурсы перед запуском игры",
+                "symbol": "◆",
+                "extra": True,
+            },
+            {
+                "id": "vpn",
+                "title": "VPN",
+                "detail": "Запустить личное VPN-подключение",
+                "symbol": "◈",
+                "extra": False,
+            },
+            {
+                "id": "claude_code",
+                "title": "Claude Code",
+                "detail": "Открыть рабочую консоль Claude Code",
+                "symbol": "⌁",
+                "extra": False,
+            },
+        ]
+
+    @Property("QVariantList", notify=historyChanged)
+    def frequentPrograms(self) -> list[dict[str, Any]]:
+        preset_commands = set(assistant.PRESET_COMMANDS)
+        preset_programs = {
+            str(program_name or "yandex browser").casefold()
+            for _title, program_name in assistant.PRESET_COMMANDS.values()
+        }
+        counts: Counter[str] = Counter()
+        display_names: dict[str, str] = {}
+        for entry in self.service.history_items:
+            if entry.get("status") != "success":
+                continue
+            command = str(entry.get("command", "")).strip()
+            if command.casefold() in preset_commands:
+                continue
+            program = str(entry.get("program", "")).strip()
+            title = str(entry.get("program_title", "")).strip()
+            if not program:
+                outcome_title = str(entry.get("title", "")).strip()
+                if not outcome_title.startswith("Открываю"):
+                    continue
+                title = outcome_title.removeprefix("Открываю:").removeprefix("Открываю").strip()
+                program = title.casefold()
+            key = program.casefold()
+            if not key or key in preset_programs or key == "jarvis":
+                continue
+            counts[key] += 1
+            display_names[key] = title or self._display_program_name(program)
+        maximum = max(counts.values(), default=1)
+        return [
+            {
+                "name": display_names[key],
+                "command": key,
+                "launches": count,
+                "launchLabel": self._launch_count_label(count),
+                "ratio": count / maximum,
+                "monogram": self._program_monogram(display_names[key]),
+                "bars": self._usage_bars(key, count),
+            }
+            for key, count in counts.most_common(5)
+        ]
+
+    @Property("QVariantMap", notify=systemStatsChanged)
+    def systemStats(self) -> dict[str, Any]:
+        return dict(self._system_stats)
+
+    @Property("QVariantList", notify=systemStatsChanged)
+    def diskItems(self) -> list[dict[str, Any]]:
+        return list(self._disk_items)
+
+    @Property(str, notify=systemStatsChanged)
+    def statsUpdatedLabel(self) -> str:
+        return self._stats_updated_label
 
     @Property(bool, notify=busyChanged)
     def busy(self) -> bool:
@@ -179,6 +413,47 @@ class DesktopBackend(QObject):
             return
         self._busy = value
         self.busyChanged.emit()
+
+    @staticmethod
+    def _display_program_name(value: str) -> str:
+        known = {
+            "visual studio code": "Visual Studio Code",
+            "google chrome": "Google Chrome",
+            "claude code": "Claude Code",
+            "vpn": "VPN",
+        }
+        return known.get(value.casefold(), value[:1].upper() + value[1:])
+
+    @staticmethod
+    def _program_monogram(value: str) -> str:
+        words = [word for word in value.replace("-", " ").split() if word]
+        if not words:
+            return "•"
+        if len(words) == 1:
+            return words[0][:2].upper()
+        return "".join(word[0].upper() for word in words[:2])
+
+    @staticmethod
+    def _launch_count_label(count: int) -> str:
+        last_two = count % 100
+        last = count % 10
+        if 11 <= last_two <= 14:
+            ending = "запусков"
+        elif last == 1:
+            ending = "запуск"
+        elif 2 <= last <= 4:
+            ending = "запуска"
+        else:
+            ending = "запусков"
+        return f"{count} {ending}"
+
+    @staticmethod
+    def _usage_bars(key: str, count: int) -> list[float]:
+        seed = sum(ord(character) for character in key) + count * 17
+        return [
+            0.28 + ((seed * (index + 3) + index * 29) % 64) / 100
+            for index in range(10)
+        ]
 
     def _set_state(self, value: str, *, restore: bool = False) -> None:
         self._state_token += 1
@@ -305,15 +580,71 @@ class DesktopBackend(QObject):
 
     @Slot(str)
     def setPage(self, page: str) -> None:
-        if page not in {"home", "apps", "game", "notes"}:
+        if page not in {
+            "home",
+            "apps",
+            "game",
+            "notes",
+            "statistics",
+            "customization",
+            "settings",
+        }:
             return
         if self._current_page != page:
             self._current_page = page
             self.currentPageChanged.emit()
+        if page == "statistics":
+            self.refreshSystemStats()
+            if not self._stats_timer.isActive():
+                self._stats_timer.start()
+        else:
+            self._stats_timer.stop()
 
     @Slot(str)
     def launchProgram(self, name: str) -> None:
         self.executeCommand(name)
+
+    @Slot(str)
+    def launchPreset(self, number: str) -> None:
+        if number in assistant.PRESET_COMMANDS:
+            self.executeCommand(number)
+
+    @Slot(str)
+    def runProtocol(self, protocol_id: str) -> None:
+        commands = {
+            "game_mode": "/game",
+            "vpn": "vpn",
+            "claude_code": "claude code",
+        }
+        command = commands.get(protocol_id)
+        if command:
+            self.executeCommand(command)
+
+    @Slot()
+    def refreshSystemStats(self) -> None:
+        if self._stats_refreshing:
+            return
+        self._stats_refreshing = True
+        worker = TaskWorker(collect_system_snapshot)
+        self._workers.add(worker)
+
+        def finish(snapshot: dict[str, Any]) -> None:
+            self._workers.discard(worker)
+            self._stats_refreshing = False
+            self._system_stats = dict(snapshot.get("resources") or self._system_stats)
+            self._disk_items = list(snapshot.get("disks") or [])
+            self._stats_updated_label = "Обновлено только что"
+            self.systemStatsChanged.emit()
+
+        def fail(_message: str) -> None:
+            self._workers.discard(worker)
+            self._stats_refreshing = False
+            self._stats_updated_label = "Не удалось обновить"
+            self.systemStatsChanged.emit()
+
+        worker.signals.finished.connect(finish)
+        worker.signals.failed.connect(fail)
+        self.thread_pool.start(worker)
 
     @Slot()
     def refreshPrograms(self) -> None:

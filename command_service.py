@@ -123,6 +123,12 @@ class HistoryStore(JsonListStore):
             "title": outcome.title,
             "detail": outcome.detail,
         }
+        program = str(outcome.data.get("program", "")).strip()
+        program_title = str(outcome.data.get("program_title", "")).strip()
+        if program:
+            entry["program"] = program
+        if program_title:
+            entry["program_title"] = program_title
         self._save_items([*self.items, entry])
         return entry
 
@@ -395,14 +401,29 @@ class CommandService:
                 scan,
             )
         if lowered in assistant.SPECIAL_LAUNCH_COMMANDS:
-            return self._launch_outcome(assistant.open_special_command(lowered))
+            title = assistant.SPECIAL_LAUNCH_COMMANDS[lowered][0]
+            return self._launch_outcome(
+                assistant.open_special_command(lowered),
+                program=lowered,
+                program_title=title,
+            )
         if lowered in assistant.PRESET_COMMANDS:
-            return self._launch_outcome(assistant.open_preset(lowered, self.program_map))
+            title, program_name = assistant.PRESET_COMMANDS[lowered]
+            return self._launch_outcome(
+                assistant.open_preset(lowered, self.program_map),
+                program=str(program_name or "yandex browser"),
+                program_title=title,
+            )
 
         program_name = assistant.extract_program_name(command)
         if not program_name:
             return CommandOutcome("not_found", "После команды нужно название", "Например: открой VS Code")
-        return self._launch_outcome(assistant.open_program(program_name, self.program_map))
+        matched_name, _score = assistant.find_program(program_name, self.program_map)
+        return self._launch_outcome(
+            assistant.open_program(program_name, self.program_map),
+            program=matched_name or "",
+            program_title=matched_name or program_name,
+        )
 
     def _pending_outcome(
         self,
@@ -468,5 +489,17 @@ class CommandService:
         )
 
     @staticmethod
-    def _launch_outcome(result: assistant.LaunchResult) -> CommandOutcome:
-        return CommandOutcome(result.kind, result.title, result.detail)
+    def _launch_outcome(
+        result: assistant.LaunchResult,
+        *,
+        program: str = "",
+        program_title: str = "",
+    ) -> CommandOutcome:
+        data: dict[str, Any] = {}
+        if result.kind == "success" and program:
+            data = {
+                "action": "launch_program",
+                "program": program,
+                "program_title": program_title or program,
+            }
+        return CommandOutcome(result.kind, result.title, result.detail, data)

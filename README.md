@@ -50,6 +50,35 @@ python assistant.py
 
 ## Сборка EXE
 
+### Личная версия интерфейса
+
+Текущий интерфейс и личная версия существуют параллельно:
+
+```powershell
+# Текущий интерфейс с питомцем
+python assistant.py
+
+# Личная голосовая оболочка без питомца
+python personal_assistant.py
+```
+
+Личная версия использует отдельный `qml/personal/PersonalMain.qml`. В ней доступны
+быстрый запуск, персональные протоколы и статистика запусков с показателями ЦП,
+видеокарты, памяти и дисков. Программы из быстрых пресетов не повторяются в
+разделе часто используемых. Цвета personal-интерфейса собраны в семантические
+токены `qml/personal/PersonalTheme.qml`, чтобы будущие темы не меняли структуру
+страниц.
+
+Для отдельной сборки personal-версии:
+
+```powershell
+python -m PyInstaller --noconfirm --clean --distpath dist --workpath .personal_build personal_assistant.spec
+```
+
+Готовый файл: `dist\JARVIS-Personal.exe`.
+
+### Текущая версия
+
 ```powershell
 python -m pip install -r requirements-dev.txt
 python -m PyInstaller --noconfirm --clean --distpath dist --workpath .desktop_build assistant.spec
