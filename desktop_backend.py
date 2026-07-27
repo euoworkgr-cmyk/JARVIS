@@ -82,6 +82,7 @@ class DesktopBackend(QObject):
         self._game_warning = ""
         self._last_message: dict[str, Any] = {}
         self._message_token = 0
+        self._state_token = 0
         self._pet_visible = True
         self._quitting = False
         self._reduced_motion = reduced_motion_enabled()
@@ -180,13 +181,17 @@ class DesktopBackend(QObject):
         self.busyChanged.emit()
 
     def _set_state(self, value: str, *, restore: bool = False) -> None:
+        self._state_token += 1
+        token = self._state_token
         if self._state != value:
             self._state = value
             self.stateChanged.emit()
-        if restore and not self._reduced_motion:
-            QTimer.singleShot(1800, self._restore_idle)
+        if restore:
+            QTimer.singleShot(1800, lambda: self._restore_idle(token))
 
-    def _restore_idle(self) -> None:
+    def _restore_idle(self, token: int) -> None:
+        if token != self._state_token:
+            return
         if not self._busy and not self._pending_action:
             self._set_state("idle")
 

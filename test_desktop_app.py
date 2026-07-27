@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -62,6 +63,25 @@ class DesktopAppSmokeTests(unittest.TestCase):
         self.assertNotIn("requestPaint", source)
         self.assertIn("layer.enabled: true", source)
         self.assertIn("RotationAnimator", source)
+
+    @patch("desktop_backend.QTimer.singleShot")
+    @patch("desktop_backend.get_work_areas", return_value=[])
+    @patch("desktop_backend.reduced_motion_enabled", return_value=True)
+    def test_reduced_motion_still_restores_only_the_latest_state(
+        self,
+        _reduced_motion_mock,
+        _work_areas_mock,
+        single_shot_mock,
+    ) -> None:
+        backend = DesktopBackend(Path(__file__).resolve().parent)
+
+        backend._set_state("success", restore=True)
+
+        single_shot_mock.assert_called_once()
+        restore_callback = single_shot_mock.call_args.args[1]
+        backend._set_state("working")
+        restore_callback()
+        self.assertEqual(backend.jarvisState, "working")
 
     def test_second_instance_notifies_existing_server(self) -> None:
         name = f"JARVIS.Desktop.Test.{uuid.uuid4().hex}"
