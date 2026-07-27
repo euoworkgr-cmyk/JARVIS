@@ -24,10 +24,10 @@ OutcomeStatus = Literal[
 
 
 def app_data_directory() -> Path:
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if local_app_data:
-        return Path(local_app_data) / assistant.APP_NAME
-    return Path.home() / f".{assistant.APP_NAME.casefold()}"
+    configured_directory = os.environ.get("JARVIS_DATA_DIR")
+    if configured_directory:
+        return Path(configured_directory)
+    return assistant.user_data_directory()
 
 
 @dataclass(frozen=True)

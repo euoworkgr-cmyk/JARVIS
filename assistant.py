@@ -174,10 +174,10 @@ def resource_directory() -> Path:
 
 
 def user_data_directory() -> Path:
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if local_app_data:
-        return Path(local_app_data) / APP_NAME
-    return Path.home() / f".{APP_NAME.casefold()}"
+    configured_directory = os.environ.get("JARVIS_DATA_DIR")
+    if configured_directory:
+        return Path(configured_directory)
+    return resource_directory() / "data"
 
 
 def program_index_path() -> Path:

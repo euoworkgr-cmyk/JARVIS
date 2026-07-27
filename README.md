@@ -46,8 +46,7 @@
 Установите отдельный набор зависимостей:
 
 ```powershell
-python -m pip install -r requirements-voice.txt
-.\scripts\setup_voice.ps1
+.\scripts\setup_voice.ps1 -InstallDependencies
 ```
 
 По умолчанию JARVIS ищет локальные файлы здесь:
@@ -76,7 +75,7 @@ python -m pip install -r requirements-voice.txt
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install --no-cache-dir -r requirements.txt
 python assistant.py
 ```
 
@@ -106,19 +105,27 @@ python personal_assistant.py
 Для отдельной сборки personal-версии:
 
 ```powershell
+$env:PYINSTALLER_CONFIG_DIR = "$PWD\.cache\pyinstaller"
+$env:TEMP = "$PWD\.tmp"
+$env:TMP = "$PWD\.tmp"
+New-Item -ItemType Directory -Force $env:PYINSTALLER_CONFIG_DIR, $env:TEMP | Out-Null
 python -m PyInstaller --noconfirm --clean --distpath dist --workpath .personal_build personal_assistant.spec
 ```
 
-Готовый файл: `dist\JARVIS-Personal.exe`.
+Готовый файл: `dist\JARVIS-Personal\JARVIS-Personal.exe`.
 
 ### Текущая версия
 
 ```powershell
-python -m pip install -r requirements-dev.txt
+$env:PYINSTALLER_CONFIG_DIR = "$PWD\.cache\pyinstaller"
+$env:TEMP = "$PWD\.tmp"
+$env:TMP = "$PWD\.tmp"
+New-Item -ItemType Directory -Force $env:PYINSTALLER_CONFIG_DIR, $env:TEMP | Out-Null
+python -m pip install --no-cache-dir -r requirements-dev.txt
 python -m PyInstaller --noconfirm --clean --distpath dist --workpath .desktop_build assistant.spec
 ```
 
-Готовый файл находится в `dist\assistant.exe`. Путь и имя сохранены совместимыми со старой терминальной сборкой, поэтому существующий ярлык запускает новый GUI. Сборка не открывает консольное окно и включает QML, иконки, спрайты питомца и начальный индекс программ. Соседний `notes.json` используется только как источник первой миграции и при сборке не удаляется.
+Готовый файл находится в `dist\assistant\assistant.exe`. Сборка не открывает консольное окно и включает QML, иконки, спрайты питомца и начальный индекс программ. Соседний `notes.json` используется только как источник первой миграции и при сборке не удаляется.
 
 ## Локальные данные
 

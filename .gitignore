@@ -1,4 +1,8 @@
 .runtime_deps/
+.venv/
+.cache/
+.tmp/
+data/
 build/
 *.py[cod]
 __pycache__/

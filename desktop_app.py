@@ -138,6 +138,16 @@ def run_desktop_app(
     open_action_text: str = "Открыть JARVIS",
     load_pet: bool = True,
 ) -> int:
+    resources = resource_directory()
+    installation_directory = (
+        Path(sys.executable).resolve().parent
+        if getattr(sys, "frozen", False)
+        else resources
+    )
+    os.environ.setdefault("JARVIS_DATA_DIR", str(installation_directory / "data"))
+    os.environ.setdefault(
+        "QML_DISK_CACHE_PATH", str(installation_directory / ".cache" / "qml")
+    )
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
     os.environ.setdefault("QSG_RENDER_LOOP", "basic")
     if os.name == "nt":
@@ -163,7 +173,6 @@ def run_desktop_app(
     if not single_instance.start():
         return 0
 
-    resources = resource_directory()
     backend = DesktopBackend(resources)
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("backend", backend)

@@ -1,12 +1,32 @@
+param(
+    [switch]$InstallDependencies
+)
+
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$runtimeDirectory = Join-Path $projectRoot ".runtime_deps"
+$cacheDirectory = Join-Path $projectRoot ".cache\pip"
+$temporaryDirectory = Join-Path $projectRoot ".tmp"
 $wakeDirectory = Join-Path $projectRoot "models\wakeword"
 $vadDirectory = Join-Path $projectRoot "models\vad"
 $whisperDirectory = Join-Path $projectRoot "models\whisper"
 $toolDirectory = Join-Path $projectRoot "tools\whisper.cpp"
 
-New-Item -ItemType Directory -Force -Path $wakeDirectory, $vadDirectory, $whisperDirectory, $toolDirectory | Out-Null
+New-Item -ItemType Directory -Force -Path $runtimeDirectory, $cacheDirectory, $temporaryDirectory, $wakeDirectory, $vadDirectory, $whisperDirectory, $toolDirectory | Out-Null
+
+# Keep project downloads, extraction files, and pip artifacts off the system drive.
+$env:PIP_CACHE_DIR = $cacheDirectory
+$env:TEMP = $temporaryDirectory
+$env:TMP = $temporaryDirectory
+
+if ($InstallDependencies) {
+    python -m pip install `
+        --disable-pip-version-check `
+        --no-cache-dir `
+        --target $runtimeDirectory `
+        --requirement (Join-Path $projectRoot "requirements-voice.txt")
+}
 
 function Get-LocalFile {
     param([string]$Url, [string]$Target)

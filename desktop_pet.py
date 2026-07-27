@@ -94,10 +94,10 @@ def default_position(
 
 
 def pet_state_path() -> Path:
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if local_app_data:
-        return Path(local_app_data) / "JARVIS" / "pet_state.json"
-    return Path.home() / ".jarvis" / "pet_state.json"
+    configured_directory = os.environ.get("JARVIS_DATA_DIR")
+    if configured_directory:
+        return Path(configured_directory) / "pet_state.json"
+    return Path(__file__).resolve().parent / "data" / "pet_state.json"
 
 
 def load_position(path: Path) -> Point | None:
