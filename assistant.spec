@@ -22,7 +22,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PIL', 'numpy'],
+    excludes=['PIL', 'numpy', 'tkinter', '_tkinter'],
     noarchive=False,
     optimize=0,
 )
@@ -34,7 +34,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='JARVIS',
+    name='assistant',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

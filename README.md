@@ -52,10 +52,10 @@ python assistant.py
 
 ```powershell
 python -m pip install -r requirements-dev.txt
-python -m PyInstaller --noconfirm --clean --distpath .desktop_dist --workpath .desktop_build assistant.spec
+python -m PyInstaller --noconfirm --clean --distpath dist --workpath .desktop_build assistant.spec
 ```
 
-Готовый файл находится в `.desktop_dist\JARVIS.exe`. Сборка не открывает консольное окно и включает QML, иконки, спрайты питомца и начальный индекс программ.
+Готовый файл находится в `dist\assistant.exe`. Путь и имя сохранены совместимыми со старой терминальной сборкой, поэтому существующий ярлык запускает новый GUI. Сборка не открывает консольное окно и включает QML, иконки, спрайты питомца и начальный индекс программ. Соседний `notes.json` используется только как источник первой миграции и при сборке не удаляется.
 
 ## Локальные данные
 
