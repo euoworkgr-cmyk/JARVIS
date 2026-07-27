@@ -1,0 +1,6 @@
+.runtime_deps/
+*.py[cod]
+__pycache__/
+.pytest_cache/
+.qmlcache/
+
