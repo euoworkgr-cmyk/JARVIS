@@ -926,21 +926,14 @@ def run_cli() -> int:
 
 
 def main() -> int:
-    def run_console_session() -> int:
+    if os.name != "nt":
         configure_terminal()
         reset_console()
         return run_cli()
 
-    if os.name != "nt":
-        return run_console_session()
+    from desktop_app import run_desktop_app
 
-    from desktop_pet import DesktopPetApp
-
-    app = DesktopPetApp(
-        resource_directory() / "assets" / "pet",
-        run_console_session,
-    )
-    return app.run()
+    return run_desktop_app()
 
 
 if __name__ == "__main__":
