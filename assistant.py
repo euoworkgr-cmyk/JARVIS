@@ -79,6 +79,11 @@ THEME = Theme(
 console = Console(theme=THEME, highlight=False)
 
 
+def reset_console() -> None:
+    global console
+    console = Console(theme=THEME, highlight=False)
+
+
 # Common spoken/transliterated names that do not fuzzy-match their Start menu names.
 TRANSLIT_MAP = {
     "вс код": "vs code",
@@ -809,8 +814,7 @@ def configure_terminal() -> None:
             pass
 
 
-def main() -> int:
-    configure_terminal()
+def run_cli() -> int:
     program_map = get_program_map()
     startup_error = None
     if not program_map:
@@ -919,6 +923,24 @@ def main() -> int:
             )
             continue
         ui.message(open_program(program_name, program_map))
+
+
+def main() -> int:
+    def run_console_session() -> int:
+        configure_terminal()
+        reset_console()
+        return run_cli()
+
+    if os.name != "nt":
+        return run_console_session()
+
+    from desktop_pet import DesktopPetApp
+
+    app = DesktopPetApp(
+        resource_directory() / "assets" / "pet",
+        run_console_session,
+    )
+    return app.run()
 
 
 if __name__ == "__main__":
