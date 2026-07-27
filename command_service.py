@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-import shutil
+import sys
 from typing import Any, Literal
 import uuid
 
@@ -159,15 +159,66 @@ class NotesStore(JsonListStore):
         legacy_path: Path | None = None,
     ) -> None:
         target = path or app_data_directory() / "notes.json"
-        legacy = legacy_path or assistant.notes_file_path()
-        if not target.exists() and legacy.exists() and legacy.resolve() != target.resolve():
-            try:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(legacy, target)
-            except OSError:
-                pass
         super().__init__(target)
         self.items = [str(item) for item in self.items if isinstance(item, str) and item.strip()]
+        self._migrate_legacy_notes(legacy_path)
+
+    def _legacy_paths(self, explicit_path: Path | None) -> list[Path]:
+        if explicit_path is not None:
+            return [explicit_path]
+
+        source_root = Path(__file__).resolve().parent
+        executable_root = Path(sys.executable).resolve().parent
+        working_root = Path.cwd()
+        candidates = [
+            assistant.notes_file_path(),
+            executable_root / "notes.json",
+            working_root / "notes.json",
+            working_root / "dist" / "notes.json",
+            source_root / "notes.json",
+            source_root / "dist" / "notes.json",
+        ]
+        unique: list[Path] = []
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                resolved = candidate
+            if resolved != self.path.resolve() and resolved not in unique:
+                unique.append(resolved)
+        return unique
+
+    def _migrate_legacy_notes(self, explicit_path: Path | None) -> None:
+        marker = self.path.with_name(".notes-migrated-v1")
+        if marker.exists():
+            return
+
+        migrated: list[str] = []
+        if not self.items:
+            for legacy in self._legacy_paths(explicit_path):
+                if not legacy.exists():
+                    continue
+                try:
+                    payload = json.loads(legacy.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if not isinstance(payload, list):
+                    continue
+                for item in payload:
+                    value = str(item).strip() if isinstance(item, str) else ""
+                    if value and value not in migrated:
+                        migrated.append(value)
+
+        if migrated:
+            self.items = migrated
+            self.save()
+
+        if self.items or migrated:
+            try:
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.touch(exist_ok=True)
+            except OSError:
+                pass
 
     def add(self, text: str) -> list[str]:
         value = text.strip()

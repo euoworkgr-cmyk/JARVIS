@@ -51,6 +51,21 @@ class NotesStoreTests(unittest.TestCase):
             self.assertEqual(notes.items, ["Первая заметка"])
             self.assertTrue(target.exists())
 
+    def test_legacy_notes_fill_empty_desktop_store(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legacy = root / "dist" / "notes.json"
+            target = root / "JARVIS" / "notes.json"
+            legacy.parent.mkdir()
+            target.parent.mkdir()
+            legacy.write_text(json.dumps(["Заметка из терминала"], ensure_ascii=False), encoding="utf-8")
+            target.write_text("[]", encoding="utf-8")
+
+            notes = NotesStore(target, legacy_path=legacy)
+
+            self.assertEqual(notes.items, ["Заметка из терминала"])
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), ["Заметка из терминала"])
+
     def test_notes_can_be_added_updated_and_removed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             notes = NotesStore(Path(directory) / "notes.json", legacy_path=Path(directory) / "missing.json")
