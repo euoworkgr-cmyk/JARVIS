@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import unittest
+import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -11,6 +12,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWidgets import QApplication
 
 from desktop_backend import DesktopBackend
+from desktop_app import SingleInstance
 
 
 class DesktopAppSmokeTests(unittest.TestCase):
@@ -31,6 +33,18 @@ class DesktopAppSmokeTests(unittest.TestCase):
         self.assertEqual(window.title(), "JARVIS Desktop")
         backend._quitting = True
         window.close()
+
+    def test_second_instance_notifies_existing_server(self) -> None:
+        name = f"JARVIS.Desktop.Test.{uuid.uuid4().hex}"
+        first = SingleInstance(name)
+        second = SingleInstance(name)
+        try:
+            self.assertTrue(first.start())
+            self.assertFalse(second.start())
+        finally:
+            if first.server is not None:
+                first.server.close()
+                first.server.removeServer(name)
 
 
 if __name__ == "__main__":

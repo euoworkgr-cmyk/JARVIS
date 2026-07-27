@@ -34,7 +34,7 @@ from game_mode import (
 
 
 APP_NAME = "JARVIS"
-APP_VERSION = "2.0"
+APP_VERSION = "3.0"
 
 VPN_EXECUTABLE = Path(
     r"C:\Users\Евгений\Documents\02_Код и проекты\VPN\HappTerminalVPN_CodexPowered\HappTerminalVPN_CodexPowered.exe"
