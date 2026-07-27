@@ -183,6 +183,7 @@ def run_desktop_app(
         return 2
 
     backend.set_main_window(main_window)
+    backend.startVoiceControl()
 
     def keep_pet_visible(visibility: QWindow.Visibility) -> None:
         if pet_window is not None and visibility == QWindow.Visibility.Minimized and backend.petVisible:

@@ -4,12 +4,14 @@
 a = Analysis(
     ['assistant.py'],
     pathex=['.runtime_deps'],
-    binaries=[],
+    binaries=[('.runtime_deps/numpy.libs/*.dll', '.')],
     datas=[
         ('programs.json', '.'),
         ('assets/pet', 'assets/pet'),
         ('assets/icons', 'assets/icons'),
         ('qml', 'qml'),
+        ('models', 'models'),
+        ('tools/whisper.cpp/Release', 'tools/whisper.cpp/Release'),
     ],
     hiddenimports=[
         'PySide6.QtNetwork',
@@ -18,11 +20,16 @@ a = Analysis(
         'PySide6.QtQuickControls2',
         'PySide6.QtSvg',
         'PySide6.QtWidgets',
+        'numpy',
+        'onnxruntime',
+        'openwakeword.model',
+        'scipy.signal',
+        'sounddevice',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PIL', 'numpy', 'tkinter', '_tkinter'],
+    excludes=['PIL', 'tkinter', '_tkinter'],
     noarchive=False,
     optimize=0,
 )

@@ -189,6 +189,8 @@ class DesktopBackend(QObject):
     petVisibleChanged = Signal()
     quittingChanged = Signal()
     systemStatsChanged = Signal()
+    voiceStatusChanged = Signal()
+    commandOutcome = Signal(object)
 
     showMainRequested = Signal()
     helpRequested = Signal()
@@ -238,6 +240,9 @@ class DesktopBackend(QObject):
         self._disk_items: list[dict[str, Any]] = []
         self._stats_updated_label = "Ожидание обновления"
         self._stats_refreshing = False
+        self._voice_controller = None
+        self._voice_status = "disabled"
+        self._voice_status_label = "Голосовое управление не запущено"
         self._stats_timer = QTimer(self)
         self._stats_timer.setInterval(3000)
         self._stats_timer.timeout.connect(self.refreshSystemStats)
@@ -456,7 +461,17 @@ class DesktopBackend(QObject):
             "success": "Команда выполнена",
             "error": "Нужна проверка",
             "pending": "Жду подтверждения",
+            "listening": "Слушаю команду",
+            "recognizing": "Распознаю речь",
         }.get(self._state, "Готов к работе")
+
+    @Property(str, notify=voiceStatusChanged)
+    def voiceStatus(self) -> str:
+        return self._voice_status
+
+    @Property(str, notify=voiceStatusChanged)
+    def voiceStatusLabel(self) -> str:
+        return self._voice_status_label
 
     @Property(str, notify=currentPageChanged)
     def currentPage(self) -> str:
@@ -592,6 +607,19 @@ class DesktopBackend(QObject):
             return
         self._run_task(lambda: self.service.execute(text), self._handle_outcome)
 
+    @Slot(str)
+    def executeVoiceCommand(self, text: str) -> None:
+        if self._busy:
+            self.commandOutcome.emit(
+                {
+                    "status": "error",
+                    "title": "Я уже выполняю другую команду",
+                    "detail": "Повторите голосовую команду после завершения текущей.",
+                }
+            )
+            return
+        self.executeCommand(text)
+
     def _handle_outcome(self, outcome: CommandOutcome) -> None:
         self.historyChanged.emit()
         if "candidates" in outcome.data:
@@ -606,6 +634,9 @@ class DesktopBackend(QObject):
             }
             self.pendingActionChanged.emit()
             self._set_state("pending")
+            self.commandOutcome.emit(
+                {"status": outcome.status, "title": outcome.title, "detail": outcome.detail}
+            )
             return
         self._pending_action = {}
         self.pendingActionChanged.emit()
@@ -624,6 +655,39 @@ class DesktopBackend(QObject):
             self._set_state("success", restore=True)
         else:
             self._set_state("idle")
+        self.commandOutcome.emit(
+            {"status": outcome.status, "title": outcome.title, "detail": outcome.detail}
+        )
+
+    @Slot()
+    def startVoiceControl(self) -> None:
+        if self._voice_controller is not None:
+            return
+        from voice_control import LocalVoiceController, VoiceConfig
+
+        controller = LocalVoiceController(
+            VoiceConfig.from_environment(self.resource_directory), self
+        )
+        controller.statusChanged.connect(self._set_voice_status)
+        controller.commandRecognized.connect(self.executeVoiceCommand)
+        controller.confirmationRequested.connect(self.confirmPending)
+        controller.cancellationRequested.connect(self.cancelPending)
+        self.commandOutcome.connect(controller.submitOutcome)
+        self._voice_controller = controller
+        controller.start()
+
+    @Slot(str, str)
+    def _set_voice_status(self, status: str, label: str) -> None:
+        self._voice_status = status
+        self._voice_status_label = label
+        self.voiceStatusChanged.emit()
+        if status in {"awake", "listening"}:
+            self._set_state("listening")
+        elif status == "recognizing":
+            self._set_state("recognizing")
+        elif status == "error":
+            self._set_message(CommandOutcome("error", "Голосовое управление недоступно", label))
+            self._set_state("error", restore=True)
 
     def _set_message(self, outcome: CommandOutcome) -> None:
         self._message_token += 1
@@ -743,6 +807,8 @@ class DesktopBackend(QObject):
     def shutdown_workers(self, timeout_ms: int = -1) -> None:
         """Wait for active QRunnables before Qt tears down their signal objects."""
         self._stats_timer.stop()
+        if self._voice_controller is not None:
+            self._voice_controller.stop()
         self.thread_pool.waitForDone(timeout_ms)
 
     def _programs_refreshed(self, outcome: CommandOutcome) -> None:

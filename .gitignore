@@ -2,6 +2,8 @@
 build/
 *.py[cod]
 __pycache__/
+models/
+tools/whisper.cpp/
 .pytest_cache/
 .qmlcache/
 .desktop_build/

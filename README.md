@@ -37,6 +37,40 @@
 
 ## Запуск из исходников
 
+### Полностью локальное голосовое управление
+
+Голосовой контур работает каскадно и не отправляет аудио в сеть:
+
+`микрофон → openWakeWord → сигнал пробуждения → Silero VAD → whisper.cpp → CommandService → локальный TTS`.
+
+Установите отдельный набор зависимостей:
+
+```powershell
+python -m pip install -r requirements-voice.txt
+.\scripts\setup_voice.ps1
+```
+
+По умолчанию JARVIS ищет локальные файлы здесь:
+
+- `models/wakeword/jarvis.onnx`, `melspectrogram.onnx`, `embedding_model.onnx`;
+- `models/vad/silero_vad.onnx`;
+- `models/whisper/ggml-base.bin`;
+- `tools/whisper.cpp/Release/whisper-server.exe` и DLL из той же сборки.
+
+`whisper-server` слушает только `127.0.0.1`: модель загружается в память один раз при
+старте JARVIS, а после wake word сервер получает только законченный WAV-фрагмент команды.
+Голосовые ответы синтезируются локальным русским SAPI-голосом Windows.
+
+Пути можно переопределить переменными `JARVIS_WAKE_MODEL`, `JARVIS_VAD_MODEL`,
+`JARVIS_WHISPER_MODEL`, `JARVIS_WHISPER_EXECUTABLE`. Для выбора микрофона задайте
+индекс или имя в `JARVIS_MICROPHONE_DEVICE`. Чувствительность регулируется через
+`JARVIS_WAKE_THRESHOLD` и `JARVIS_VAD_THRESHOLD`; отключение контура —
+`JARVIS_VOICE_ENABLED=0`.
+
+Текущая официальная модель openWakeWord обучена на фразе «Hey Jarvis» и может
+реагировать на одиночное «Джарвис», но для гарантированного русского произношения
+её следует заменить собственной ONNX-моделью, не меняя остальной конвейер.
+
 Требуется Windows 10/11 x64 и Python 3.12 или новее.
 
 ```powershell

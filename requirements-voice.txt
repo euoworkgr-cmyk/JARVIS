@@ -1,0 +1,5 @@
+-r requirements.txt
+numpy>=2.0,<3
+openwakeword>=0.6,<1
+onnxruntime>=1.20,<2
+sounddevice>=0.5,<1
