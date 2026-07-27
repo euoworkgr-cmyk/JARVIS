@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import Property, QObject, QRunnable, QThreadPool, QTimer, Signal, Slot
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QWindow
 
 import assistant
 from command_service import CommandOutcome, CommandService, NotesStore
@@ -403,7 +403,10 @@ class DesktopBackend(QObject):
         if self._main_window is None:
             self.showMainRequested.emit()
             return
-        self._main_window.show()
+        if self._main_window.visibility() == QWindow.Visibility.Minimized:
+            self._main_window.showNormal()
+        else:
+            self._main_window.show()
         self._main_window.raise_()
         self._main_window.requestActivate()
 

@@ -26,7 +26,7 @@ Window {
             onTapped: {
                 petWindow.sprite = "emotion"
                 petRestore.restart()
-                backend.toggleMainWindow()
+                backend.showMainWindow()
             }
         }
 
