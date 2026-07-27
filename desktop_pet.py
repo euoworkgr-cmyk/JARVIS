@@ -19,6 +19,10 @@ TRANSPARENT_COLOR = "#00ff00"
 SW_SHOW = 5
 SW_RESTORE = 9
 MONITORINFOF_PRIMARY = 1
+STD_OUTPUT_HANDLE = -11
+ENABLE_PROCESSED_OUTPUT = 0x0001
+ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+UTF8_CODE_PAGE = 65001
 
 
 @dataclass(frozen=True)
@@ -170,6 +174,29 @@ class Win32ConsoleApi:
         self.user32.SetForegroundWindow(window)
 
 
+def enable_virtual_terminal_processing(kernel32=None) -> bool:
+    api = kernel32 or ctypes.windll.kernel32
+    output_handle = api.GetStdHandle(STD_OUTPUT_HANDLE)
+    if not output_handle:
+        return False
+
+    current_mode = wintypes.DWORD()
+    if not api.GetConsoleMode(output_handle, ctypes.byref(current_mode)):
+        return False
+
+    requested_mode = (
+        current_mode.value
+        | ENABLE_PROCESSED_OUTPUT
+        | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    )
+    if not api.SetConsoleMode(output_handle, requested_mode):
+        return False
+
+    api.SetConsoleOutputCP(UTF8_CODE_PAGE)
+    api.SetConsoleCP(UTF8_CODE_PAGE)
+    return True
+
+
 def bind_console_streams() -> None:
     sys.stdin = open("CONIN$", "r", encoding="utf-8", errors="replace")
     sys.stdout = open(
@@ -178,6 +205,7 @@ def bind_console_streams() -> None:
     sys.stderr = open(
         "CONOUT$", "w", encoding="utf-8", errors="replace", buffering=1
     )
+    enable_virtual_terminal_processing()
 
 
 class ConsoleWindowController:

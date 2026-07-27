@@ -14,6 +14,7 @@ from desktop_pet import (
     SW_SHOW,
     clamp_position,
     default_position,
+    enable_virtual_terminal_processing,
     is_drag,
     load_position,
     random_delay_ms,
@@ -102,7 +103,44 @@ class FakeConsoleApi:
         self.foreground_windows.append(window)
 
 
+class FakeKernel32:
+    def __init__(self, mode: int) -> None:
+        self.mode = mode
+        self.requested_modes: list[int] = []
+        self.output_code_pages: list[int] = []
+        self.input_code_pages: list[int] = []
+
+    def GetStdHandle(self, _stream: int) -> int:
+        return 404
+
+    def GetConsoleMode(self, _handle: int, mode_pointer) -> bool:
+        mode_pointer._obj.value = self.mode
+        return True
+
+    def SetConsoleMode(self, _handle: int, mode: int) -> bool:
+        self.requested_modes.append(mode)
+        return True
+
+    def SetConsoleOutputCP(self, code_page: int) -> bool:
+        self.output_code_pages.append(code_page)
+        return True
+
+    def SetConsoleCP(self, code_page: int) -> bool:
+        self.input_code_pages.append(code_page)
+        return True
+
+
 class ConsoleWindowControllerTests(unittest.TestCase):
+    def test_new_console_enables_ansi_and_utf8(self) -> None:
+        kernel32 = FakeKernel32(mode=0x0002)
+
+        enabled = enable_virtual_terminal_processing(kernel32)
+
+        self.assertTrue(enabled)
+        self.assertEqual(kernel32.requested_modes, [0x0007])
+        self.assertEqual(kernel32.output_code_pages, [65001])
+        self.assertEqual(kernel32.input_code_pages, [65001])
+
     def test_first_click_allocates_console_and_starts_session_once(self) -> None:
         api = FakeConsoleApi()
         stream_bindings: list[bool] = []
