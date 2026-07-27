@@ -94,7 +94,7 @@ class AssistantSpecialCommandTests(unittest.TestCase):
         self.assertEqual(result.kind, "success")
         launch_mock.assert_called_once_with(assistant.VPN_EXECUTABLE)
 
-    def test_claude_code_command_uses_configured_shortcut(self) -> None:
+    def test_claude_code_command_uses_configured_launcher(self) -> None:
         with (
             patch("assistant.Path.is_file", return_value=True),
             patch("assistant.launch_target") as launch_mock,
@@ -102,7 +102,17 @@ class AssistantSpecialCommandTests(unittest.TestCase):
             result = assistant.open_special_command("Claude code")
 
         self.assertEqual(result.kind, "success")
-        launch_mock.assert_called_once_with(str(assistant.CLAUDE_CODE_SHORTCUT))
+        launch_mock.assert_called_once_with(str(assistant.CLAUDE_CODE_LAUNCHER))
+
+    def test_claude_code_launcher_falls_back_to_existing_batch_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            desktop = Path(directory)
+            batch_file = desktop / "Claude code.bat"
+            batch_file.touch()
+
+            launcher = assistant.resolve_claude_code_launcher(desktop)
+
+        self.assertEqual(launcher, batch_file)
 
     @patch("assistant.os.startfile")
     @patch("assistant.os.path.exists", return_value=True)
@@ -116,6 +126,19 @@ class AssistantSpecialCommandTests(unittest.TestCase):
         assistant.launch_target(shortcut)
 
         startfile_mock.assert_called_once_with(shortcut)
+
+    @patch("assistant.os.startfile")
+    @patch("assistant.os.path.exists", return_value=True)
+    def test_batch_launcher_is_opened_via_windows_shell(
+        self,
+        _exists_mock,
+        startfile_mock,
+    ) -> None:
+        batch_file = r"C:\Users\Евгений\Desktop\Claude code.bat"
+
+        assistant.launch_target(batch_file)
+
+        startfile_mock.assert_called_once_with(batch_file)
 
     @patch("assistant.subprocess.Popen")
     def test_vpn_console_does_not_inherit_jarvis_input(self, popen_mock) -> None:

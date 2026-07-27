@@ -36,16 +36,34 @@ from game_mode import (
 APP_NAME = "JARVIS"
 APP_VERSION = "3.0"
 
+
+def user_desktop_directory() -> Path:
+    user_profile = os.environ.get("USERPROFILE")
+    if user_profile:
+        return Path(user_profile) / "Desktop"
+    return Path.home() / "Desktop"
+
+
+def resolve_claude_code_launcher(desktop: Path | None = None) -> Path:
+    root = desktop or user_desktop_directory()
+    candidates = (
+        root / "Claude code.lnk",
+        root / "Claude code.bat",
+        root / "Claude code.cmd",
+    )
+    return next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
+
+
 VPN_EXECUTABLE = Path(
     r"C:\Users\Евгений\Documents\02_Код и проекты\VPN\HappTerminalVPN_CodexPowered\HappTerminalVPN_CodexPowered.exe"
 )
-CLAUDE_CODE_SHORTCUT = Path(r"C:\Users\Евгений\Desktop\Claude code.lnk")
+CLAUDE_CODE_LAUNCHER = resolve_claude_code_launcher()
 YANDEX_BROWSER_EXECUTABLE = Path(
     r"C:\Program Files\Yandex\YandexBrowser\Application\browser.exe"
 )
 SPECIAL_LAUNCH_COMMANDS = {
     "vpn": ("VPN", VPN_EXECUTABLE, True),
-    "claude code": ("Claude Code", CLAUDE_CODE_SHORTCUT, False),
+    "claude code": ("Claude Code", CLAUDE_CODE_LAUNCHER, False),
 }
 PRESET_COMMANDS = {
     "1": ("Новое окно Яндекс Браузера", None),
@@ -280,7 +298,7 @@ def launch_target(app_id: str) -> None:
     is_existing_file = os.path.isabs(expanded) and os.path.exists(expanded)
     is_uri = bool(re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", app_id))
 
-    if is_existing_file and Path(expanded).suffix.casefold() == ".lnk":
+    if is_existing_file and Path(expanded).suffix.casefold() in {".lnk", ".bat", ".cmd"}:
         os.startfile(expanded)
     elif is_existing_file:
         subprocess.Popen([expanded])
