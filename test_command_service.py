@@ -189,7 +189,9 @@ class CommandServiceTests(unittest.TestCase):
         self.assertEqual(outcome.status, "not_found")
         self.assertEqual(outcome.data["candidates"], [])
 
-    def test_clear_history_requires_confirmation(self) -> None:
+    @patch("command_service.assistant.open_program")
+    def test_clear_history_requires_confirmation(self, open_mock) -> None:
+        open_mock.return_value = assistant.LaunchResult("success", "Открываю chrome")
         with tempfile.TemporaryDirectory() as directory:
             service = self.make_service(Path(directory) / "history.json")
             service.execute("chrome")
