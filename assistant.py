@@ -184,6 +184,23 @@ def program_index_path() -> Path:
     return user_data_directory() / "programs.json"
 
 
+def current_jarvis_executable() -> Path | None:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve()
+    source_build = resource_directory() / "dist" / "assistant.exe"
+    return source_build.resolve() if source_build.is_file() else None
+
+
+def with_current_jarvis_target(program_map: dict[str, str]) -> dict[str, str]:
+    result = dict(program_map)
+    if "jarvis" not in result:
+        return result
+    executable = current_jarvis_executable()
+    if executable is not None:
+        result["jarvis"] = str(executable)
+    return result
+
+
 def notes_file_path() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent / "notes.json"
@@ -222,11 +239,11 @@ def get_program_map() -> dict[str, str]:
         except (OSError, json.JSONDecodeError):
             continue
         if isinstance(data, dict):
-            return {
+            return with_current_jarvis_target({
                 str(name).lower(): str(app_id)
                 for name, app_id in data.items()
                 if name and app_id
-            }
+            })
     return {}
 
 
@@ -234,7 +251,7 @@ def generate_program_map() -> tuple[dict[str, str], str | None]:
     try:
         from get_programs import get_installed_programs
 
-        program_map = get_installed_programs()
+        program_map = with_current_jarvis_target(get_installed_programs())
     except (ImportError, OSError, subprocess.SubprocessError) as error:
         return {}, f"Не удалось обновить список: {error}"
     if not program_map:

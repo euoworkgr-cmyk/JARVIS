@@ -84,6 +84,17 @@ class AssistantSpecialCommandTests(unittest.TestCase):
             ("камера", 100),
         )
 
+    @patch("assistant.current_jarvis_executable")
+    def test_stale_jarvis_index_uses_current_executable(self, executable_mock) -> None:
+        executable_mock.return_value = Path(r"A:\JARVIS\dist\assistant.exe")
+
+        program_map = assistant.with_current_jarvis_target(
+            {"jarvis": r"D:\Jarvis\Jarvis.exe", "chrome": "Chrome"}
+        )
+
+        self.assertEqual(program_map["jarvis"], r"A:\JARVIS\dist\assistant.exe")
+        self.assertEqual(program_map["chrome"], "Chrome")
+
     def test_vpn_command_uses_configured_executable(self) -> None:
         with (
             patch("assistant.Path.is_file", return_value=True),
