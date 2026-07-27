@@ -136,9 +136,9 @@ ApplicationWindow {
 
                 Repeater {
                     model: [
-                        { symbol: "—", label: "Свернуть", action: "minimize" },
-                        { symbol: "□", label: "Развернуть", action: "maximize" },
-                        { symbol: "×", label: "Скрыть в трей", action: "close" }
+                        { label: "Свернуть", action: "minimize" },
+                        { label: "Развернуть", action: "maximize" },
+                        { label: "Скрыть в трей", action: "close" }
                     ]
                     delegate: Rectangle {
                         required property var modelData
@@ -149,12 +149,12 @@ ApplicationWindow {
                                : "transparent"
                         Accessible.role: Accessible.Button
                         Accessible.name: modelData.label
-                        Shared.LabelSmooth {
+                        PersonalIcon {
                             anchors.centerIn: parent
-                            text: modelData.symbol
+                            width: 18
+                            height: 18
+                            name: modelData.action
                             color: PersonalTheme.muted
-                            font.family: PersonalTheme.bodyFont
-                            font.pixelSize: PersonalTheme.title
                         }
                         HoverHandler { id: buttonHover }
                         TapHandler {

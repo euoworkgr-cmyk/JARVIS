@@ -190,14 +190,22 @@ Item {
                                     }
                                 }
 
-                                contentItem: Shared.LabelSharp {
-                                    text: backend.busy ? "Выполняю" : "Запустить"
-                                    color: "#17190F"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: PersonalTheme.caption
-                                    font.weight: Font.DemiBold
+                                contentItem: Row {
+                                    spacing: 7
+                                    anchors.centerIn: parent
+                                    PersonalIcon {
+                                        width: 16
+                                        height: 16
+                                        name: "send"
+                                        color: "#17190F"
+                                    }
+                                    Shared.LabelSharp {
+                                        text: backend.busy ? "Выполняю" : "Запустить"
+                                        color: "#17190F"
+                                        font.family: PersonalTheme.bodyFont
+                                        font.pixelSize: PersonalTheme.caption
+                                        font.weight: Font.DemiBold
+                                    }
                                 }
 
                                 HoverHandler { id: executeHover }
@@ -414,14 +422,13 @@ Item {
                             contentItem: RowLayout {
                                 spacing: 13
 
-                                Shared.LabelSmooth {
+                                PersonalIcon {
                                     Layout.leftMargin: 16
                                     Layout.preferredWidth: 28
-                                    text: protocolRow.modelData.symbol
+                                    Layout.preferredHeight: 28
+                                    name: protocolRow.modelData.id === "game_mode" ? "game"
+                                          : protocolRow.modelData.id === "vpn" ? "shield" : "terminal"
                                     color: PersonalTheme.accent
-                                    horizontalAlignment: Text.AlignHCenter
-                                    font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: PersonalTheme.title
                                 }
 
                                 ColumnLayout {
@@ -460,12 +467,12 @@ Item {
                                     }
                                 }
 
-                                Shared.LabelSmooth {
+                                PersonalIcon {
                                     Layout.rightMargin: 16
-                                    text: "›"
+                                    Layout.preferredWidth: 18
+                                    Layout.preferredHeight: 18
+                                    name: "chevron-right"
                                     color: protocolHover.hovered ? PersonalTheme.text : PersonalTheme.muted
-                                    font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: PersonalTheme.hero
                                 }
                             }
 
