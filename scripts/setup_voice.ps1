@@ -51,11 +51,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $toolDirectory "Release\whisper-serv
     Expand-Archive -LiteralPath $whisperArchive -DestinationPath $toolDirectory -Force
 }
 
-$whisperModel = Join-Path $whisperDirectory "ggml-base.bin"
-Get-LocalFile "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true" $whisperModel
-$expectedModelHash = "465707469FF3A37A2B9B8D8F89F2F99DE7299DAC"
+$whisperModel = Join-Path $whisperDirectory "ggml-small.bin"
+Get-LocalFile "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin?download=true" $whisperModel
+$expectedModelHash = "55356645C2B361A969DFD0EF2C5A50D530AFD8D5"
 if ((Get-FileHash -LiteralPath $whisperModel -Algorithm SHA1).Hash -ne $expectedModelHash) {
-    throw "Whisper base model checksum mismatch"
+    throw "Whisper small model checksum mismatch"
 }
 
 Write-Host "Local voice models are ready."

@@ -16,6 +16,26 @@ Window {
     title: "JARVIS Pet"
     property string sprite: "idle"
 
+    function syncWithAssistant() {
+        if (petDrag.active)
+            return
+        if (backend.jarvisState === "listening")
+            sprite = "gesture"
+        else if (backend.jarvisState === "recognizing" || backend.jarvisState === "working")
+            sprite = "laptop"
+        else if (backend.jarvisState === "success")
+            sprite = "emotion"
+        else if (backend.jarvisState === "error")
+            sprite = "jump"
+        else
+            sprite = "idle"
+    }
+
+    Connections {
+        target: backend
+        function onStateChanged() { petWindow.syncWithAssistant() }
+    }
+
     Image {
         width: 128
         height: 128
@@ -39,7 +59,7 @@ Window {
                     petWindow.sprite = "gesture"
                     petWindow.startSystemMove()
                 } else {
-                    petWindow.sprite = "idle"
+                    petWindow.syncWithAssistant()
                     backend.savePetPosition(petWindow.x, petWindow.y)
                     petWindow.x = backend.petX
                     petWindow.y = backend.petY
@@ -51,13 +71,13 @@ Window {
     Timer {
         id: petRestore
         interval: 520
-        onTriggered: if (!petDrag.active) petWindow.sprite = "idle"
+        onTriggered: if (!petDrag.active) petWindow.syncWithAssistant()
     }
 
     Timer {
         interval: 3000 + Math.random() * 4000
         repeat: true
-        running: !Theme.reducedMotion
+        running: !Theme.reducedMotion && backend.jarvisState === "idle"
         onTriggered: {
             if (!petDrag.active && petWindow.sprite === "idle") {
                 petWindow.sprite = "blink"
@@ -71,7 +91,7 @@ Window {
     Timer {
         interval: 20000 + Math.random() * 20000
         repeat: true
-        running: !Theme.reducedMotion
+        running: !Theme.reducedMotion && backend.jarvisState === "idle"
         onTriggered: {
             if (!petDrag.active && petWindow.sprite === "idle") {
                 const choices = ["laptop", "jump"]

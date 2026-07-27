@@ -53,7 +53,7 @@
 
 - `models/wakeword/jarvis.onnx`, `melspectrogram.onnx`, `embedding_model.onnx`;
 - `models/vad/silero_vad.onnx`;
-- `models/whisper/ggml-base.bin`;
+- `models/whisper/ggml-small.bin`;
 - `tools/whisper.cpp/Release/whisper-server.exe` и DLL из той же сборки.
 
 `whisper-server` слушает только `127.0.0.1`: модель загружается в память один раз при

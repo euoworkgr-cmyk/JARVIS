@@ -84,8 +84,21 @@ Item {
                                 border.width: 1
                                 border.color: PersonalTheme.accentMuted
 
+                                Image {
+                                    id: frequentProgramIcon
+                                    anchors.centerIn: parent
+                                    width: 32
+                                    height: 32
+                                    source: "image://programicons/program/" + modelData.iconId
+                                    sourceSize: Qt.size(32, 32)
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    cache: false
+                                }
+
                                 Shared.LabelSharp {
                                     anchors.centerIn: parent
+                                    visible: frequentProgramIcon.status !== Image.Ready
                                     text: modelData.monogram
                                     color: PersonalTheme.accent
                                     font.family: PersonalTheme.utilityFont

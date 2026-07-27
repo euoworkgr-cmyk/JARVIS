@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 from typing import Any, Callable
+from urllib.parse import quote, unquote
 
 import psutil
 from PySide6.QtCore import Property, QObject, QRunnable, QThreadPool, QTimer, Signal, Slot
@@ -263,7 +264,18 @@ class DesktopBackend(QObject):
 
     @Property("QVariantList", notify=historyChanged)
     def historyItems(self) -> list[dict[str, Any]]:
-        return self.service.history_items
+        items: list[dict[str, Any]] = []
+        for entry in self.service.history_items:
+            program_title = str(entry.get("program_title", "")).strip()
+            items.append(
+                {
+                    **entry,
+                    "displayTitle": self._display_program_name(program_title)
+                    if program_title
+                    else str(entry.get("title", "")),
+                }
+            )
+        return items
 
     @Property("QVariantList", notify=programsChanged)
     def programItems(self) -> list[dict[str, str]]:
@@ -365,6 +377,67 @@ class DesktopBackend(QObject):
         self._preset_icon_targets[number] = result
         return result
 
+    def program_icon_target(self, identifier: str) -> str | None:
+        decoded = unquote(identifier).split("?", 1)[0]
+        if decoded.startswith("preset/"):
+            return self.preset_icon_target(decoded.removeprefix("preset/"))
+        if decoded.isdigit():
+            return self.preset_icon_target(decoded)
+        if not decoded.startswith("program/"):
+            return None
+
+        program = decoded.removeprefix("program/").strip().casefold()
+        cache_key = f"program:{program}"
+        if cache_key in self._preset_icon_targets:
+            return self._preset_icon_targets[cache_key]
+
+        local_app_data = Path(os.environ.get("LOCALAPPDATA", ""))
+        known_candidates = {
+            "яндекс музыка": [
+                local_app_data / "Programs" / "YandexMusic" / "Яндекс Музыка.exe"
+            ],
+            "яндекс.музыка": [
+                local_app_data / "Programs" / "YandexMusic" / "Яндекс Музыка.exe"
+            ],
+            "яндекс браузер": [assistant.YANDEX_BROWSER_EXECUTABLE],
+            "yandex browser": [assistant.YANDEX_BROWSER_EXECUTABLE],
+        }
+        target = self.service.program_map.get(program, "")
+        candidates = list(known_candidates.get(program, []))
+        expanded_target = Path(os.path.expandvars(target)) if target else None
+        if expanded_target is not None and expanded_target.is_file():
+            candidates.append(expanded_target)
+        result = next((str(candidate) for candidate in candidates if candidate.is_file()), None)
+        if result is None:
+            roaming_app_data = Path(os.environ.get("APPDATA", ""))
+            start_menu_roots = [
+                roaming_app_data / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+                Path(os.environ.get("ProgramData", r"C:\ProgramData"))
+                / "Microsoft"
+                / "Windows"
+                / "Start Menu"
+                / "Programs",
+            ]
+            search_names = {program, self._display_program_name(program).casefold()}
+            for start_menu in start_menu_roots:
+                if not start_menu.is_dir():
+                    continue
+                try:
+                    result = next(
+                        (
+                            str(shortcut)
+                            for shortcut in start_menu.rglob("*.lnk")
+                            if any(name and name in shortcut.stem.casefold() for name in search_names)
+                        ),
+                        None,
+                    )
+                except OSError:
+                    continue
+                if result is not None:
+                    break
+        self._preset_icon_targets[cache_key] = result
+        return result
+
     @Property("QVariantList", constant=True)
     def protocolItems(self) -> list[dict[str, Any]]:
         return [
@@ -428,6 +501,7 @@ class DesktopBackend(QObject):
                 "launchLabel": self._launch_count_label(count),
                 "ratio": count / maximum,
                 "monogram": self._program_monogram(display_names[key]),
+                "iconId": quote(key, safe=""),
                 "bars": self._usage_bars(key, count),
             }
             for key, count in counts.most_common(4)
@@ -525,6 +599,11 @@ class DesktopBackend(QObject):
             "visual studio code": "Visual Studio Code",
             "google chrome": "Google Chrome",
             "claude code": "Claude Code",
+            "яндекс музыка": "Яндекс Музыка",
+            "яндекс.музыка": "Яндекс Музыка",
+            "яндекс браузер": "Яндекс Браузер",
+            "telegram": "Telegram",
+            "chatgpt": "ChatGPT",
             "vpn": "VPN",
         }
         return known.get(value.casefold(), value[:1].upper() + value[1:])

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import ctypes
+from ctypes import wintypes
 import os
 from pathlib import Path
 import sys
 
 from PySide6.QtCore import QFileInfo, QIODevice, QObject, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QFont, QFontDatabase, QGuiApplication, QIcon, QPixmap, QWindow
+from PySide6.QtGui import QAction, QFont, QFontDatabase, QGuiApplication, QIcon, QImage, QPixmap, QWindow
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickImageProvider, QQuickWindow, QSGRendererInterface
@@ -15,6 +17,24 @@ from desktop_backend import DesktopBackend
 
 
 INSTANCE_NAME = "JARVIS.Desktop.Instance"
+
+
+def ensure_windows_autostart(value_name: str) -> bool:
+    """Register the frozen desktop build for background startup at user logon."""
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        return False
+    try:
+        import winreg
+
+        command = f'"{Path(sys.executable).resolve()}"'
+        with winreg.CreateKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+        ) as key:
+            winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, command)
+        return True
+    except OSError:
+        return False
 
 
 class ProgramIconProvider(QQuickImageProvider):
@@ -31,17 +51,53 @@ class ProgramIconProvider(QQuickImageProvider):
         size: QSize,
         requested_size: QSize,
     ) -> QPixmap:
-        target = self.backend.preset_icon_target(identifier)
+        target = self.backend.program_icon_target(identifier)
         if target is None:
             return QPixmap()
 
-        icon = self.file_icons.icon(QFileInfo(target))
         dimensions = requested_size if requested_size.isValid() else QSize(32, 32)
-        pixmap = icon.pixmap(dimensions)
+        pixmap = self._windows_pixmap(target, dimensions)
+        if pixmap.isNull():
+            pixmap = self.file_icons.icon(QFileInfo(target)).pixmap(dimensions)
         if not pixmap.isNull():
             size.setWidth(pixmap.width())
             size.setHeight(pixmap.height())
         return pixmap
+
+    @staticmethod
+    def _windows_pixmap(target: str, dimensions: QSize) -> QPixmap:
+        if os.name != "nt":
+            return QPixmap()
+
+        class SHFILEINFO(ctypes.Structure):
+            _fields_ = [
+                ("hIcon", wintypes.HICON),
+                ("iIcon", ctypes.c_int),
+                ("dwAttributes", wintypes.DWORD),
+                ("szDisplayName", wintypes.WCHAR * 260),
+                ("szTypeName", wintypes.WCHAR * 80),
+            ]
+
+        info = SHFILEINFO()
+        flags = 0x000000100 | 0x000000000  # SHGFI_ICON | SHGFI_LARGEICON
+        result = ctypes.windll.shell32.SHGetFileInfoW(
+            target,
+            0,
+            ctypes.byref(info),
+            ctypes.sizeof(info),
+            flags,
+        )
+        if not result or not info.hIcon:
+            return QPixmap()
+        try:
+            image = QImage.fromHICON(info.hIcon)
+            return QPixmap.fromImage(image).scaled(
+                dimensions,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        finally:
+            ctypes.windll.user32.DestroyIcon(info.hIcon)
 
 
 def resource_directory() -> Path:
@@ -137,6 +193,7 @@ def run_desktop_app(
     display_name: str = "JARVIS · Desktop command center",
     open_action_text: str = "Открыть JARVIS",
     load_pet: bool = True,
+    autostart_name: str | None = None,
 ) -> int:
     resources = resource_directory()
     installation_directory = (
@@ -172,6 +229,8 @@ def run_desktop_app(
     single_instance = SingleInstance(instance_name)
     if not single_instance.start():
         return 0
+    if autostart_name:
+        ensure_windows_autostart(autostart_name)
 
     backend = DesktopBackend(resources)
     engine = QQmlApplicationEngine()

@@ -306,11 +306,11 @@ Item {
                                             anchors.centerIn: parent
                                             width: 40
                                             height: 40
-                                            source: "image://programicons/" + presetCard.modelData.number
+                                            source: "image://programicons/preset/" + presetCard.modelData.number
                                             sourceSize: Qt.size(40, 40)
                                             fillMode: Image.PreserveAspectFit
                                             smooth: true
-                                            cache: true
+                                            cache: false
                                         }
 
                                         Rectangle {
@@ -523,7 +523,7 @@ Item {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 202
+                        Layout.preferredHeight: 238
                         radius: PersonalTheme.radiusMedium
                         color: PersonalTheme.surface
                         border.width: 1
@@ -567,8 +567,8 @@ Item {
                                 required property var modelData
                                 required property int index
                                 width: Math.round(historyList.width - 14)
-                                height: 28
-                                radius: 6
+                                height: 44
+                                radius: 8
                                 color: historyTap.pressed ? PersonalTheme.backgroundDeep
                                                           : historyHover.hovered ? PersonalTheme.surfaceHover
                                                                                  : PersonalTheme.surfaceRaised
@@ -626,7 +626,7 @@ Item {
 
                                 Rectangle {
                                     width: 2
-                                    height: 16
+                                    height: 22
                                     radius: 1
                                     color: historyRow.statusColor
                                     anchors.left: parent.left
@@ -636,34 +636,52 @@ Item {
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 18
-                                    anchors.rightMargin: 10
-                                    spacing: 10
+                                    anchors.leftMargin: 20
+                                    anchors.rightMargin: 12
+                                    spacing: 12
 
-                                    Shared.LabelSmooth {
-                                        Layout.preferredWidth: 210
-                                        text: historyRow.modelData.command
-                                        color: PersonalTheme.text
-                                        elide: Text.ElideRight
-                                        font.family: PersonalTheme.utilityFont
-                                        font.pixelSize: PersonalTheme.micro
-                                    }
-                                    Shared.LabelSmooth {
+                                    ColumnLayout {
                                         Layout.fillWidth: true
-                                        text: historyRow.modelData.title
-                                        color: PersonalTheme.muted
-                                        elide: Text.ElideRight
-                                        font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: PersonalTheme.micro
+                                        spacing: 1
+
+                                        Shared.LabelSmooth {
+                                            Layout.fillWidth: true
+                                            text: historyRow.modelData.command
+                                            color: PersonalTheme.text
+                                            elide: Text.ElideRight
+                                            font.family: PersonalTheme.utilityFont
+                                            font.pixelSize: PersonalTheme.micro
+                                            font.weight: Font.DemiBold
+                                        }
+                                        Shared.LabelSmooth {
+                                            Layout.fillWidth: true
+                                            text: historyRow.modelData.displayTitle
+                                            color: PersonalTheme.muted
+                                            elide: Text.ElideRight
+                                            font.family: PersonalTheme.bodyFont
+                                            font.pixelSize: PersonalTheme.micro
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.preferredWidth: historyStatus.implicitWidth + 16
+                                        Layout.preferredHeight: 22
+                                        radius: 11
+                                        color: PersonalTheme.backgroundDeep
+                                        border.width: 1
+                                        border.color: historyRow.statusColor
+
+                                        Shared.LabelSmooth {
+                                            id: historyStatus
+                                            anchors.centerIn: parent
+                                            text: root.historyStatusLabel(historyRow.modelData.status)
+                                            color: historyRow.statusColor
+                                            font.family: PersonalTheme.bodyFont
+                                            font.pixelSize: PersonalTheme.micro
+                                        }
                                     }
                                     Shared.LabelSmooth {
-                                        text: root.historyStatusLabel(historyRow.modelData.status)
-                                        color: historyRow.statusColor
-                                        font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: PersonalTheme.micro
-                                    }
-                                    Shared.LabelSmooth {
-                                        Layout.preferredWidth: 34
+                                        Layout.preferredWidth: 38
                                         text: root.historyTime(historyRow.modelData.timestamp)
                                         color: PersonalTheme.subtle
                                         horizontalAlignment: Text.AlignRight

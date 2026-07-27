@@ -152,6 +152,18 @@ class CommandServiceTests(unittest.TestCase):
             self.assertEqual(result.status, "success")
             activate_mock.assert_called_once_with(scan_mock.return_value, force=True)
 
+    @patch("command_service.scan_named_processes")
+    def test_russian_close_command_uses_kill_confirmation(self, scan_mock) -> None:
+        candidate = ProcessCandidate(42, "browser.exe", 10.0, 0.0, "kill · совпадение 100%")
+        scan_mock.return_value = GameModeScan([candidate], False)
+        with tempfile.TemporaryDirectory() as directory:
+            service = self.make_service(Path(directory) / "history.json")
+
+            pending = service.execute("Закрой Яндекс")
+
+        self.assertEqual(pending.status, "pending")
+        scan_mock.assert_called_once_with("browser")
+
     @patch("command_service.activate_game_mode")
     @patch("command_service.scan_game_mode")
     def test_game_mode_keeps_graceful_shutdown(self, scan_mock, activate_mock) -> None:

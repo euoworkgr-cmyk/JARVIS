@@ -27,10 +27,17 @@ class VoiceControlTests(unittest.TestCase):
                 wake_embedding_model=root / "embedding_model.onnx",
                 vad_model=root / "silero_vad.onnx",
                 whisper_executable=root / "whisper-cli.exe",
-                whisper_model=root / "ggml-base.bin",
+                whisper_model=root / "ggml-small.bin",
             )
             with self.assertRaises(VoiceSetupError):
                 config.validate()
+
+    def test_default_configuration_uses_multilingual_small_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = VoiceConfig.from_environment(Path(directory))
+
+        self.assertEqual(config.whisper_model.name, "ggml-small.bin")
+        self.assertLess(config.wake_threshold, 0.5)
 
 
 if __name__ == "__main__":

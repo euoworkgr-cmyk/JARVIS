@@ -79,6 +79,10 @@ KILL_PROCESS_ALIASES = {
     "вс код": "code",
     "яндекс": "browser",
     "яндекс браузер": "browser",
+    "яндекс музыка": "яндекс музыка",
+    "яндекс музыку": "яндекс музыка",
+    "яндекс.музыка": "яндекс музыка",
+    "телеграмм": "telegram",
 }
 
 THEME = Theme(
@@ -432,10 +436,21 @@ def extract_program_name(command: str) -> str:
 def extract_kill_target(command: str) -> str | None:
     value = " ".join(command.strip().split())
     lowered = value.casefold()
-    if lowered == "kill":
-        return ""
-    if lowered.startswith("kill "):
-        return value[5:].strip()
+    for prefix in (
+        "kill",
+        "закрой",
+        "закрыть",
+        "заверши",
+        "завершить",
+        "останови",
+        "close",
+        "terminate",
+    ):
+        if lowered == prefix:
+            return ""
+        marker = f"{prefix} "
+        if lowered.startswith(marker):
+            return value[len(marker) :].strip()
     return None
 
 

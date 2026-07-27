@@ -10,7 +10,8 @@ def main() -> int:
         instance_name="JARVIS.Personal.Instance",
         display_name="JARVIS Personal",
         open_action_text="Открыть JARVIS Personal",
-        load_pet=False,
+        load_pet=True,
+        autostart_name="JARVIS Personal",
     )
 
 

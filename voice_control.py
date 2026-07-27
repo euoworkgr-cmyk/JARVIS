@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 import base64
 import io
@@ -39,7 +40,7 @@ class VoiceConfig:
     vad_model: Path
     whisper_executable: Path
     whisper_model: Path
-    wake_threshold: float = 0.55
+    wake_threshold: float = 0.40
     vad_threshold: float = 0.50
     speech_start_timeout: float = 5.0
     silence_timeout: float = 0.75
@@ -84,10 +85,10 @@ class VoiceConfig:
             whisper_model=Path(
                 os.environ.get(
                     "JARVIS_WHISPER_MODEL",
-                    models / "whisper" / "ggml-base.bin",
+                    models / "whisper" / "ggml-small.bin",
                 )
             ),
-            wake_threshold=float(os.environ.get("JARVIS_WAKE_THRESHOLD", "0.55")),
+            wake_threshold=float(os.environ.get("JARVIS_WAKE_THRESHOLD", "0.40")),
             vad_threshold=float(os.environ.get("JARVIS_VAD_THRESHOLD", "0.50")),
             microphone_device=device,
         )
@@ -244,6 +245,12 @@ class SileroVoiceActivityDetector:
 
 
 class WhisperCppRecognizer:
+    COMMAND_PROMPT = (
+        "Команды голосового ассистента Джарвис: открой, запусти, закрой, заверши, "
+        "Яндекс Браузер, Яндекс Музыка, Telegram, VS Code, ChatGPT, VPN, "
+        "подтверждаю, отмена."
+    )
+
     def __init__(self, executable: Path, model: Path) -> None:
         self._executable = executable
         self._model = model
@@ -258,6 +265,12 @@ class WhisperCppRecognizer:
                 "ru",
                 "-nt",
                 "-sns",
+                "-t",
+                str(min(6, os.cpu_count() or 4)),
+                "-bs",
+                "5",
+                "--prompt",
+                self.COMMAND_PROMPT,
                 "--host",
                 "127.0.0.1",
                 "--port",
@@ -278,7 +291,7 @@ class WhisperCppRecognizer:
             return int(listener.getsockname()[1])
 
     def _wait_until_ready(self) -> None:
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + 60
         url = f"http://127.0.0.1:{self._port}/"
         while time.monotonic() < deadline:
             if self._process.poll() is not None:
@@ -290,7 +303,7 @@ class WhisperCppRecognizer:
             except (OSError, urllib.error.URLError):
                 time.sleep(0.1)
         self.close()
-        raise TimeoutError("whisper-server не загрузил модель за 30 секунд")
+        raise TimeoutError("whisper-server не загрузил модель за 60 секунд")
 
     def recognize(self, pcm: bytes) -> str:
         audio = io.BytesIO()
@@ -308,7 +321,7 @@ class WhisperCppRecognizer:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=45) as response:
+            with urllib.request.urlopen(request, timeout=90) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except (OSError, ValueError, urllib.error.URLError) as error:
             raise RuntimeError(f"whisper.cpp не распознал команду: {error}") from error
@@ -321,6 +334,8 @@ class WhisperCppRecognizer:
             b"--" + marker + b"\r\nContent-Disposition: form-data; name=\"file\"; filename=\"command.wav\"\r\nContent-Type: audio/wav\r\n\r\n" + wav + b"\r\n",
             b"--" + marker + b"\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n",
             b"--" + marker + b"\r\nContent-Disposition: form-data; name=\"temperature\"\r\n\r\n0.0\r\n",
+            b"--" + marker + b"\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nru\r\n",
+            b"--" + marker + b"\r\nContent-Disposition: form-data; name=\"prompt\"\r\n\r\n" + WhisperCppRecognizer.COMMAND_PROMPT.encode("utf-8") + b"\r\n",
             b"--" + marker + b"--\r\n",
         ]
         return b"".join(parts)
@@ -429,6 +444,22 @@ class VoicePipeline:
             return
         try:
             self.config.validate()
+        except Exception as error:
+            self.on_status("error", str(error))
+            return
+        while not self._stop.is_set():
+            try:
+                self._run_once()
+                return
+            except Exception as error:
+                self.on_status("error", str(error))
+                if self._stop.wait(4.0):
+                    return
+                self.on_status("restarting", "Переподключаю голосовое управление")
+
+    def _run_once(self) -> None:
+        recognizer: WhisperCppRecognizer | None = None
+        try:
             wake = OpenWakeWordDetector(
                 self.config.wake_model,
                 self.config.wake_melspec_model,
@@ -442,13 +473,11 @@ class VoicePipeline:
             recognizer = WhisperCppRecognizer(
                 self.config.whisper_executable, self.config.whisper_model
             )
-            try:
-                with SoundDeviceMicrophone(self.config.microphone_device) as microphone:
-                    self._run_loop(microphone, wake, vad, recognizer, speaker)
-            finally:
+            with SoundDeviceMicrophone(self.config.microphone_device) as microphone:
+                self._run_loop(microphone, wake, vad, recognizer, speaker)
+        finally:
+            if recognizer is not None:
                 recognizer.close()
-        except Exception as error:
-            self.on_status("error", str(error))
 
     def _run_loop(
         self,
@@ -498,8 +527,10 @@ class VoicePipeline:
         vad.reset()
         started = False
         started_at = time.monotonic()
+        speech_started_at = started_at
         last_speech = started_at
         frames: list[bytes] = []
+        pre_roll: deque[bytes] = deque(maxlen=5)
         while not self._stop.is_set():
             frame = microphone.read()
             now = time.monotonic()
@@ -508,17 +539,24 @@ class VoicePipeline:
                 for offset in range(0, len(frame) - VAD_FRAME_SAMPLES * 2 + 1, VAD_FRAME_SAMPLES * 2)
             ]
             speech = any(decisions)
+            if not started:
+                pre_roll.append(frame)
+                if speech:
+                    started = True
+                    speech_started_at = now
+                    last_speech = now
+                    frames.extend(pre_roll)
+                elif now - started_at >= self.config.speech_start_timeout:
+                    return b""
+                continue
+            frames.append(frame)
             if speech:
-                started = True
                 last_speech = now
             if started:
-                frames.append(frame)
                 if now - last_speech >= self.config.silence_timeout:
                     break
-                if now - started_at >= self.config.max_utterance_seconds:
+                if now - speech_started_at >= self.config.max_utterance_seconds:
                     break
-            elif now - started_at >= self.config.speech_start_timeout:
-                return b""
         return b"".join(frames)
 
     def _wait_for_outcome(self) -> dict[str, Any] | None:
