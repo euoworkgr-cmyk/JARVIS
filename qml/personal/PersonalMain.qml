@@ -14,7 +14,7 @@ ApplicationWindow {
     visible: false
     color: PersonalTheme.backgroundDeep
     flags: Qt.Window | Qt.FramelessWindowHint
-    title: "JARVIS Personal"
+    title: "Supersonic"
     property bool windowMoving: false
 
     function pageComponent(page) {
@@ -119,11 +119,19 @@ ApplicationWindow {
                 }
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
+                    spacing: -1
+                    Shared.LabelSharp {
+                        text: "Supersonic"
+                        color: PersonalTheme.text
+                        font.family: PersonalTheme.displayFont
+                        font.pixelSize: PersonalTheme.body
+                        font.weight: Font.DemiBold
+                    }
                     Shared.LabelSharp {
                         text: "Голосовой помощник"
-                        color: PersonalTheme.text
-                        font.family: PersonalTheme.bodyFont
-                        font.pixelSize: PersonalTheme.body
+                        color: PersonalTheme.subtle
+                        font.family: PersonalTheme.utilityFont
+                        font.pixelSize: PersonalTheme.micro
                     }
                 }
             }

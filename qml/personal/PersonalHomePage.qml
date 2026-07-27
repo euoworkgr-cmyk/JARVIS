@@ -152,7 +152,7 @@ Item {
                                     font.family: PersonalTheme.bodyFont
                                     font.pixelSize: PersonalTheme.label
                                     renderType: Text.NativeRendering
-                                    Accessible.name: "Команда JARVIS"
+                                    Accessible.name: "Команда Supersonic"
                                     background: Item { }
                                     onAccepted: root.submitCommand()
                                 }

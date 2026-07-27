@@ -188,7 +188,7 @@ Item {
             Column {
                 spacing: 2
                 LabelSharp {
-                    text: "JARVIS CORE"
+                    text: "SUPERSONIC CORE"
                     color: Theme.muted
                     font.family: Theme.monoFont
                     font.pixelSize: Theme.micro

@@ -216,7 +216,7 @@ class ConsoleWindowController:
         *,
         api: ConsoleApi | None = None,
         stream_binder: Callable[[], None] = bind_console_streams,
-        title: str = "JARVIS · Desktop launcher",
+        title: str = "Supersonic · Desktop launcher",
     ) -> None:
         self._api = api or Win32ConsoleApi()
         self._session_target = session_target
@@ -235,12 +235,12 @@ class ConsoleWindowController:
             window = self._api.get_console_window()
             if not window:
                 if not self._api.alloc_console():
-                    raise OSError("Windows не удалось создать консоль JARVIS")
+                    raise OSError("Windows не удалось создать консоль Supersonic")
                 self._stream_binder()
                 self._api.set_console_title(self._title)
                 window = self._api.get_console_window()
                 if not window:
-                    raise OSError("Windows не вернула дескриптор консоли JARVIS")
+                    raise OSError("Windows не вернула дескриптор консоли Supersonic")
 
             command = SW_RESTORE if self._api.is_iconic(window) else SW_SHOW
             self._api.show_window(window, command)
@@ -354,7 +354,7 @@ class DesktopPetApp:
 
         self.root = tk.Tk()
         self.root.withdraw()
-        self.root.title("JARVIS Pet")
+        self.root.title("Supersonic Pet")
         self.root.overrideredirect(True)
         self.root.configure(background=TRANSPARENT_COLOR)
         self.root.wm_attributes("-topmost", True)

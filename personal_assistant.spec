@@ -39,7 +39,7 @@ exe = EXE(
     pyz,
     a.scripts,
     [],
-    name='JARVIS-Personal',
+    name='Supersonic',
     exclude_binaries=True,
     debug=False,
     bootloader_ignore_signals=False,
@@ -62,5 +62,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='JARVIS-Personal',
+    name='Supersonic',
 )

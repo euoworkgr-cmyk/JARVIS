@@ -37,9 +37,9 @@ class DesktopAppSmokeTests(unittest.TestCase):
             for window in engine.rootObjects()
             if isinstance(window, QQuickWindow)
         }
-        self.assertEqual(set(windows), {"JARVIS Desktop", "JARVIS Pet"})
-        main_window = windows["JARVIS Desktop"]
-        pet_window = windows["JARVIS Pet"]
+        self.assertEqual(set(windows), {"Supersonic Desktop", "Supersonic Pet"})
+        main_window = windows["Supersonic Desktop"]
+        pet_window = windows["Supersonic Pet"]
         self.assertEqual(main_window.color().alpha(), 255)
         self.assertIsNone(pet_window.transientParent())
 

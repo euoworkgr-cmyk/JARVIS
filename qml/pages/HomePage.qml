@@ -247,7 +247,7 @@ Item {
                             font.pixelSize: Theme.title
                             renderType: Text.QtRendering
                             enabled: !backend.busy
-                            Accessible.name: "Команда JARVIS"
+                            Accessible.name: "Команда Supersonic"
                             background: Rectangle {
                                 radius: 13
                                 color: "#CC06132E"

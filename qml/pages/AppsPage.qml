@@ -276,7 +276,7 @@ Item {
                     Item { Layout.fillHeight: true }
                     LabelSharp {
                         Layout.fillWidth: true
-                        text: "Пути пока используются из текущей конфигурации JARVIS."
+                        text: "Пути пока используются из текущей конфигурации Supersonic."
                         color: "#657AA4"
                         wrapMode: Text.WordWrap
                         font.family: Theme.bodyFont

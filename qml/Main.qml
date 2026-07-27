@@ -15,7 +15,7 @@ ApplicationWindow {
     visible: false
     color: Theme.backgroundDeep
     flags: Qt.Window | Qt.FramelessWindowHint
-    title: "JARVIS Desktop"
+    title: "Supersonic Desktop"
     property bool windowMoving: false
 
     function pageComponent(page) {
@@ -138,7 +138,7 @@ ApplicationWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
                     LabelSmooth {
-                        text: "JARVIS"
+                        text: "Supersonic"
                         color: Theme.text
                         font.family: Theme.headingFont
                         font.pixelSize: Theme.title
@@ -626,7 +626,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Column {
                     LabelSmooth {
-                        text: "Команды JARVIS"
+                        text: "Команды Supersonic"
                         color: Theme.text
                         font.family: Theme.headingFont
                         font.pixelSize: Theme.hero
@@ -676,7 +676,7 @@ ApplicationWindow {
                     ["выключить пк(30)", "Запланировать выключение"],
                     ["перезагрузка / спящий режим", "Управление питанием"],
                     ["/clear", "Очистить локальную историю"],
-                    ["/exit", "Полностью завершить JARVIS"]
+                    ["/exit", "Полностью завершить Supersonic"]
                 ]
                 delegate: Rectangle {
                     required property var modelData

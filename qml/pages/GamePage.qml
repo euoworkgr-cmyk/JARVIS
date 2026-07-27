@@ -120,7 +120,7 @@ Item {
                             }
                             LabelSharp {
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                text: "Jarvis покажет браузеры и приложения с заметной GPU-нагрузкой."
+                                text: "Supersonic покажет браузеры и приложения с заметной GPU-нагрузкой."
                                 color: Theme.muted
                                 font.family: Theme.bodyFont
                                 font.pixelSize: Theme.label
@@ -231,7 +231,7 @@ Item {
                         }
                         LabelSharp {
                             Layout.fillWidth: true
-                            text: "Jarvis найдёт процесс и покажет точное дерево перед завершением."
+                            text: "Supersonic найдёт процесс и покажет точное дерево перед завершением."
                             color: Theme.text
                             wrapMode: Text.WordWrap
                             font.family: Theme.bodyFont
@@ -292,7 +292,7 @@ Item {
                         }
                         LabelSharp {
                             Layout.fillWidth: true
-                            text: "Системные процессы Windows, NVIDIA, JARVIS, Steam, Epic Games Launcher и игровые процессы не закрываются."
+                            text: "Системные процессы Windows, NVIDIA, Supersonic, Steam, Epic Games Launcher и игровые процессы не закрываются."
                             color: Theme.text
                             wrapMode: Text.WordWrap
                             font.family: Theme.bodyFont

@@ -579,7 +579,7 @@ def main() -> int:
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8")
 
-    parser = argparse.ArgumentParser(description="JARVIS Game Mode")
+    parser = argparse.ArgumentParser(description="Supersonic Game Mode")
     parser.add_argument("--yes", action="store_true", help="закрыть без подтверждения")
     parser.add_argument("--preview", action="store_true", help="только показать процессы")
     parser.add_argument("--threshold", type=float, default=DEFAULT_GPU_THRESHOLD)

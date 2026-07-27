@@ -97,6 +97,7 @@ class AssistantSpecialCommandTests(unittest.TestCase):
         )
 
         self.assertEqual(program_map["jarvis"], r"A:\JARVIS\dist\assistant.exe")
+        self.assertEqual(program_map["supersonic"], r"A:\JARVIS\dist\assistant.exe")
         self.assertEqual(program_map["chrome"], "Chrome")
 
     def test_vpn_command_uses_configured_executable(self) -> None:

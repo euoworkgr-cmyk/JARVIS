@@ -16,10 +16,13 @@ from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu, QSystemTra
 from desktop_backend import DesktopBackend
 
 
-INSTANCE_NAME = "JARVIS.Desktop.Instance"
+INSTANCE_NAME = "Supersonic.Desktop.Instance"
 
 
-def ensure_windows_autostart(value_name: str) -> bool:
+def ensure_windows_autostart(
+    value_name: str,
+    legacy_value_names: tuple[str, ...] = (),
+) -> bool:
     """Register the frozen desktop build for background startup at user logon."""
     if os.name != "nt" or not getattr(sys, "frozen", False):
         return False
@@ -32,6 +35,13 @@ def ensure_windows_autostart(value_name: str) -> bool:
             r"Software\Microsoft\Windows\CurrentVersion\Run",
         ) as key:
             winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, command)
+            for legacy_name in legacy_value_names:
+                if legacy_name == value_name:
+                    continue
+                try:
+                    winreg.DeleteValue(key, legacy_name)
+                except FileNotFoundError:
+                    pass
         return True
     except OSError:
         return False
@@ -146,8 +156,8 @@ def create_tray(
     backend: DesktopBackend,
     resources: Path,
     *,
-    display_name: str = "JARVIS · Desktop command center",
-    open_action_text: str = "Открыть JARVIS",
+    display_name: str = "Supersonic · Desktop command center",
+    open_action_text: str = "Открыть Supersonic",
     include_pet: bool = True,
 ) -> QSystemTrayIcon:
     icon_path = resources / "assets" / "pet" / "idle.png"
@@ -188,12 +198,13 @@ def create_tray(
 def run_desktop_app(
     *,
     main_qml: str = "Main.qml",
-    main_window_title: str = "JARVIS Desktop",
+    main_window_title: str = "Supersonic Desktop",
     instance_name: str = INSTANCE_NAME,
-    display_name: str = "JARVIS · Desktop command center",
-    open_action_text: str = "Открыть JARVIS",
+    display_name: str = "Supersonic · Desktop command center",
+    open_action_text: str = "Открыть Supersonic",
     load_pet: bool = True,
     autostart_name: str | None = None,
+    legacy_autostart_names: tuple[str, ...] = (),
 ) -> int:
     resources = resource_directory()
     installation_directory = (
@@ -221,16 +232,16 @@ def run_desktop_app(
         else "Segoe UI"
     )
     app.setFont(QFont(ui_font_family))
-    app.setApplicationName("JARVIS")
-    app.setApplicationDisplayName("JARVIS Desktop")
-    app.setOrganizationName("JARVIS")
+    app.setApplicationName("Supersonic")
+    app.setApplicationDisplayName("Supersonic Desktop")
+    app.setOrganizationName("Supersonic")
     app.setQuitOnLastWindowClosed(False)
 
     single_instance = SingleInstance(instance_name)
     if not single_instance.start():
         return 0
     if autostart_name:
-        ensure_windows_autostart(autostart_name)
+        ensure_windows_autostart(autostart_name, legacy_autostart_names)
 
     backend = DesktopBackend(resources)
     engine = QQmlApplicationEngine()
@@ -246,7 +257,7 @@ def run_desktop_app(
         if isinstance(window, QQuickWindow)
     }
     main_window = root_windows.get(main_window_title)
-    pet_window = root_windows.get("JARVIS Pet") if load_pet else None
+    pet_window = root_windows.get("Supersonic Pet") if load_pet else None
     if main_window is None or (load_pet and pet_window is None):
         return 2
 

@@ -315,11 +315,11 @@ class CommandService:
         lowered = command.casefold()
 
         if lowered in assistant.EXIT_COMMANDS:
-            return CommandOutcome("exit", "Завершаю JARVIS")
+            return CommandOutcome("exit", "Завершаю Supersonic")
         if lowered in {"/help", "help", "помощь"}:
             return CommandOutcome(
                 "info",
-                "Команды JARVIS",
+                "Команды Supersonic",
                 "Открываю встроенную справку.",
                 {"action": "help"},
             )

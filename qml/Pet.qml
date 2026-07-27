@@ -13,7 +13,7 @@ Window {
     color: "transparent"
     transientParent: null
     flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
-    title: "JARVIS Pet"
+    title: "Supersonic Pet"
     property string sprite: "idle"
 
     function syncWithAssistant() {

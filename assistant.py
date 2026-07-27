@@ -33,7 +33,7 @@ from game_mode import (
 )
 
 
-APP_NAME = "JARVIS"
+APP_NAME = "Supersonic"
 APP_VERSION = "3.0"
 
 
@@ -202,6 +202,7 @@ def with_current_jarvis_target(program_map: dict[str, str]) -> dict[str, str]:
     executable = current_jarvis_executable()
     if executable is not None:
         result["jarvis"] = str(executable)
+        result["supersonic"] = str(executable)
     return result
 
 
@@ -330,7 +331,7 @@ def launch_target(app_id: str) -> None:
 
 
 def launch_console_target(path: Path) -> None:
-    """Start a console app with input isolated from the JARVIS console."""
+    """Start a console app with input isolated from the Supersonic console."""
     creation_flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
     subprocess.Popen(
         [str(path)],
@@ -606,7 +607,7 @@ class JarvisUI:
         commands.add_row("/game preview", "Показать, что будет закрыто")
         commands.add_row("/clear", "Очистить текущую сессию")
         commands.add_row("/help", "Показать эту справку")
-        commands.add_row("/exit", "Завершить JARVIS")
+        commands.add_row("/exit", "Завершить Supersonic")
         console.print()
         console.print(
             Panel(

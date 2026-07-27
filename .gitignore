@@ -16,4 +16,5 @@ tools/whisper.cpp/
 .desktop_onedir/
 .desktop_onedir_build/
 dist/JARVIS-Personal/
+dist/Supersonic/
 notes.json

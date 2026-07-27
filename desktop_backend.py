@@ -488,7 +488,7 @@ class DesktopBackend(QObject):
                 title = outcome_title.removeprefix("Открываю:").removeprefix("Открываю").strip()
                 program = title.casefold()
             key = program.casefold()
-            if not key or key in preset_programs or key == "jarvis":
+            if not key or key in preset_programs or key in {"jarvis", "supersonic"}:
                 continue
             counts[key] += 1
             display_names[key] = title or self._display_program_name(program)

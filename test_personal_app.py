@@ -27,8 +27,8 @@ class PersonalAppTests(unittest.TestCase):
         personal_source = (root / "qml" / "personal" / "PersonalMain.qml").read_text(
             encoding="utf-8"
         )
-        self.assertIn('title: "JARVIS Desktop"', classic_source)
-        self.assertIn('title: "JARVIS Personal"', personal_source)
+        self.assertIn('title: "Supersonic Desktop"', classic_source)
+        self.assertIn('title: "Supersonic"', personal_source)
         self.assertIn("load_pet=True", (root / "personal_assistant.py").read_text(encoding="utf-8"))
 
         engine = QQmlApplicationEngine()
@@ -39,7 +39,7 @@ class PersonalAppTests(unittest.TestCase):
         )
 
         windows = [item for item in engine.rootObjects() if isinstance(item, QQuickWindow)]
-        self.assertEqual([window.title() for window in windows], ["JARVIS Personal"])
+        self.assertEqual([window.title() for window in windows], ["Supersonic"])
         backend._quitting = True
         windows[0].close()
 
