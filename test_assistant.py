@@ -167,6 +167,27 @@ class AssistantSpecialCommandTests(unittest.TestCase):
         self.assertEqual(result.kind, "success")
         launch_mock.assert_called_once_with(camera_app_id)
 
+    @patch("get_programs.get_installed_programs")
+    @patch("assistant.program_index_path")
+    def test_program_index_can_be_refreshed_in_desktop_build(
+        self,
+        index_path_mock,
+        installed_mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "JARVIS" / "programs.json"
+            index_path_mock.return_value = path
+            installed_mock.return_value = {"новая программа": "Example.App"}
+
+            programs, error = assistant.generate_program_map()
+
+            self.assertIsNone(error)
+            self.assertEqual(programs, {"новая программа": "Example.App"})
+            self.assertEqual(
+                assistant.json.loads(path.read_text(encoding="utf-8")),
+                programs,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

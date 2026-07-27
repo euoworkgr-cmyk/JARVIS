@@ -241,6 +241,24 @@ ApplicationWindow {
                         selected: backend.currentPage === "home"
                         onClicked: backend.setPage("home")
                     }
+                    NavButton {
+                        iconSource: Qt.resolvedUrl("../assets/icons/apps.svg")
+                        label: "Приложения"
+                        selected: backend.currentPage === "apps"
+                        onClicked: backend.setPage("apps")
+                    }
+                    NavButton {
+                        iconSource: Qt.resolvedUrl("../assets/icons/game.svg")
+                        label: "Игровой режим"
+                        selected: backend.currentPage === "game"
+                        onClicked: backend.setPage("game")
+                    }
+                    NavButton {
+                        iconSource: Qt.resolvedUrl("../assets/icons/notes.svg")
+                        label: "Заметки"
+                        selected: backend.currentPage === "notes"
+                        onClicked: backend.setPage("notes")
+                    }
                 }
 
                 NavButton {
@@ -253,10 +271,94 @@ ApplicationWindow {
                 }
             }
 
-            HomePage {
+            StackLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                currentIndex: backend.currentPage === "apps" ? 1
+                            : backend.currentPage === "game" ? 2
+                            : backend.currentPage === "notes" ? 3 : 0
+
+                HomePage { }
+                AppsPage { }
+                GamePage { }
+                NotesPage { }
             }
+        }
+    }
+
+    Rectangle {
+        id: toast
+        z: 900
+        width: Math.min(430, window.width - 80)
+        height: backend.lastMessage.detail ? 82 : 66
+        radius: 16
+        color: Theme.panelStrong
+        border.width: 1
+        border.color: backend.lastMessage.status === "error" || backend.lastMessage.status === "not_found"
+                      ? "#8FFF5D6C" : backend.lastMessage.status === "success"
+                      ? "#7F42D392" : Theme.borderStrong
+        anchors.right: parent.right
+        anchors.rightMargin: 24
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: backend.lastMessage.title ? 24 : -height - 10
+        visible: anchors.bottomMargin > -height
+
+        Behavior on anchors.bottomMargin {
+            enabled: !backend.reducedMotion
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+
+        readonly property color statusColor: backend.lastMessage.status === "error" || backend.lastMessage.status === "not_found"
+                                             ? Theme.danger : backend.lastMessage.status === "success"
+                                             ? Theme.success : Theme.accent
+
+        Rectangle {
+            width: 4
+            height: parent.height - 22
+            radius: 2
+            color: toast.statusColor
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        Column {
+            anchors.left: parent.left
+            anchors.leftMargin: 28
+            anchors.right: closeToast.left
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
+            Text {
+                width: parent.width
+                text: backend.lastMessage.title || ""
+                color: Theme.text
+                elide: Text.ElideRight
+                font.family: Theme.bodyFont
+                font.pixelSize: 13
+                font.weight: Font.DemiBold
+            }
+            Text {
+                width: parent.width
+                visible: text.length > 0
+                text: backend.lastMessage.detail || ""
+                color: Theme.muted
+                elide: Text.ElideRight
+                font.family: Theme.bodyFont
+                font.pixelSize: 11
+            }
+        }
+        Rectangle {
+            id: closeToast
+            width: 30
+            height: 30
+            radius: 9
+            color: closeToastHover.hovered ? "#263A68" : "transparent"
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            Text { anchors.centerIn: parent; text: "×"; color: Theme.muted; font.pixelSize: 18 }
+            HoverHandler { id: closeToastHover }
+            TapHandler { onTapped: backend.dismissMessage() }
         }
     }
 

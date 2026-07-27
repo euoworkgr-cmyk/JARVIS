@@ -56,6 +56,8 @@ class DesktopBackend(QObject):
     stateChanged = Signal()
     currentPageChanged = Signal()
     pendingActionChanged = Signal()
+    gameScanChanged = Signal()
+    lastMessageChanged = Signal()
     petPositionChanged = Signal()
     petVisibleChanged = Signal()
     quittingChanged = Signal()
@@ -76,6 +78,10 @@ class DesktopBackend(QObject):
         self._state = "idle"
         self._current_page = "home"
         self._pending_action: dict[str, Any] = {}
+        self._game_candidates: list[dict[str, Any]] = []
+        self._game_warning = ""
+        self._last_message: dict[str, Any] = {}
+        self._message_token = 0
         self._pet_visible = True
         self._quitting = False
         self._reduced_motion = reduced_motion_enabled()
@@ -134,6 +140,18 @@ class DesktopBackend(QObject):
     @Property("QVariantMap", notify=pendingActionChanged)
     def pendingAction(self) -> dict[str, Any]:
         return dict(self._pending_action)
+
+    @Property("QVariantList", notify=gameScanChanged)
+    def gameCandidates(self) -> list[dict[str, Any]]:
+        return list(self._game_candidates)
+
+    @Property(str, notify=gameScanChanged)
+    def gameWarning(self) -> str:
+        return self._game_warning
+
+    @Property("QVariantMap", notify=lastMessageChanged)
+    def lastMessage(self) -> dict[str, Any]:
+        return dict(self._last_message)
 
     @Property(bool, constant=True)
     def reducedMotion(self) -> bool:
@@ -206,6 +224,10 @@ class DesktopBackend(QObject):
 
     def _handle_outcome(self, outcome: CommandOutcome) -> None:
         self.historyChanged.emit()
+        if "candidates" in outcome.data:
+            self._game_candidates = list(outcome.data.get("candidates") or [])
+            self._game_warning = str(outcome.data.get("warning") or "")
+            self.gameScanChanged.emit()
         if outcome.status == "pending":
             self._pending_action = {
                 **outcome.data,
@@ -220,6 +242,7 @@ class DesktopBackend(QObject):
         if outcome.status == "exit":
             self.quitApplication()
             return
+        self._set_message(outcome)
         action = str(outcome.data.get("action", ""))
         if action in {"apps", "notes"}:
             self.setPage(action)
@@ -231,6 +254,30 @@ class DesktopBackend(QObject):
             self._set_state("success", restore=True)
         else:
             self._set_state("idle")
+
+    def _set_message(self, outcome: CommandOutcome) -> None:
+        self._message_token += 1
+        token = self._message_token
+        self._last_message = {
+            "status": outcome.status,
+            "title": outcome.title,
+            "detail": outcome.detail,
+        }
+        self.lastMessageChanged.emit()
+
+        def clear_if_current() -> None:
+            if self._message_token == token:
+                self.dismissMessage()
+
+        QTimer.singleShot(4200, clear_if_current)
+
+    @Slot()
+    def dismissMessage(self) -> None:
+        if not self._last_message:
+            return
+        self._message_token += 1
+        self._last_message = {}
+        self.lastMessageChanged.emit()
 
     @Slot()
     def confirmPending(self) -> None:
@@ -293,6 +340,7 @@ class DesktopBackend(QObject):
             self._handle_outcome(CommandOutcome("error", "Не удалось сохранить заметку", str(error)))
             return
         self.notesChanged.emit()
+        self._set_message(CommandOutcome("success", "Заметка добавлена"))
         self._set_state("success", restore=True)
 
     @Slot(int, str)
@@ -303,6 +351,7 @@ class DesktopBackend(QObject):
             self._handle_outcome(CommandOutcome("error", "Не удалось изменить заметку", str(error)))
             return
         self.notesChanged.emit()
+        self._set_message(CommandOutcome("success", "Заметка изменена"))
         self._set_state("success", restore=True)
 
     @Slot(int)
@@ -313,6 +362,7 @@ class DesktopBackend(QObject):
             self._handle_outcome(CommandOutcome("error", "Не удалось удалить заметку", str(error)))
             return
         self.notesChanged.emit()
+        self._set_message(CommandOutcome("success", "Заметка удалена"))
 
     @Slot()
     def clearNotes(self) -> None:
@@ -322,6 +372,7 @@ class DesktopBackend(QObject):
             self._handle_outcome(CommandOutcome("error", "Не удалось очистить заметки", str(error)))
             return
         self.notesChanged.emit()
+        self._set_message(CommandOutcome("success", "Заметки очищены"))
 
     @Slot(int, int)
     def savePetPosition(self, x: int, y: int) -> None:

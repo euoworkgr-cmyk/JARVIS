@@ -1,0 +1,314 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import ".."
+import "../components"
+
+Item {
+    id: root
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 14
+
+        RowLayout {
+            Layout.fillWidth: true
+            Column {
+                spacing: 3
+                Text {
+                    text: "ИГРОВОЙ РЕЖИМ"
+                    color: Theme.text
+                    font.family: Theme.headingFont
+                    font.pixelSize: 25
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 0.8
+                }
+                Text {
+                    text: "Освободите ресурсы перед запуском игры"
+                    color: Theme.muted
+                    font.family: Theme.bodyFont
+                    font.pixelSize: 13
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ActionButton {
+                text: backend.busy ? "Сканирую…" : "Проверить"
+                enabled: !backend.busy
+                onClicked: backend.previewGameMode()
+            }
+            ActionButton {
+                text: "Протокол игры"
+                accent: true
+                enabled: !backend.busy
+                onClicked: backend.activateGameMode()
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 14
+
+            GlassPanel {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 13
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            text: "НАЙДЕННЫЕ ПРОЦЕССЫ"
+                            color: Theme.text
+                            font.family: Theme.headingFont
+                            font.pixelSize: 17
+                            font.weight: Font.DemiBold
+                        }
+                        Item { Layout.fillWidth: true }
+                        Rectangle {
+                            width: 38
+                            height: 26
+                            radius: 13
+                            color: backend.gameCandidates.length > 0 ? "#2CF3B85B" : "#18345F"
+                            Text {
+                                anchors.centerIn: parent
+                                text: backend.gameCandidates.length
+                                color: backend.gameCandidates.length > 0 ? Theme.warning : Theme.muted
+                                font.family: Theme.monoFont
+                                font.pixelSize: 11
+                                font.weight: Font.Bold
+                            }
+                        }
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        Column {
+                            visible: backend.gameCandidates.length === 0
+                            anchors.centerIn: parent
+                            spacing: 9
+                            Rectangle {
+                                width: 56
+                                height: 56
+                                radius: 18
+                                color: "#2538A7FF"
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                Image {
+                                    anchors.centerIn: parent
+                                    source: Qt.resolvedUrl("../../assets/icons/game.svg")
+                                    sourceSize.width: 26
+                                    sourceSize.height: 26
+                                }
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "Сначала выполните проверку"
+                                color: Theme.text
+                                font.family: Theme.bodyFont
+                                font.pixelSize: 16
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "Jarvis покажет браузеры и приложения с заметной GPU-нагрузкой."
+                                color: Theme.muted
+                                font.family: Theme.bodyFont
+                                font.pixelSize: 12
+                            }
+                        }
+
+                        ListView {
+                            id: processList
+                            anchors.fill: parent
+                            visible: backend.gameCandidates.length > 0
+                            model: backend.gameCandidates
+                            spacing: 9
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: processList.width - 12
+                                height: 64
+                                radius: 13
+                                color: "#A00C1C3D"
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 15
+                                    anchors.rightMargin: 15
+                                    Rectangle {
+                                        width: 34
+                                        height: 34
+                                        radius: 11
+                                        color: "#2CF3B85B"
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "!"
+                                            color: Theme.warning
+                                            font.family: Theme.headingFont
+                                            font.pixelSize: 17
+                                            font.weight: Font.Bold
+                                        }
+                                    }
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 3
+                                        Text {
+                                            width: parent.width
+                                            text: modelData.name
+                                            color: Theme.text
+                                            elide: Text.ElideRight
+                                            font.family: Theme.bodyFont
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+                                        Text {
+                                            text: modelData.reason
+                                            color: Theme.muted
+                                            font.family: Theme.bodyFont
+                                            font.pixelSize: 11
+                                        }
+                                    }
+                                    Text {
+                                        text: "PID " + modelData.pid
+                                        color: Theme.muted
+                                        font.family: Theme.monoFont
+                                        font.pixelSize: 10
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        visible: backend.gameWarning.length > 0
+                        text: backend.gameWarning
+                        color: Theme.warning
+                        wrapMode: Text.WordWrap
+                        font.family: Theme.bodyFont
+                        font.pixelSize: 11
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.preferredWidth: 286
+                Layout.fillHeight: true
+                spacing: 14
+
+                GlassPanel {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 198
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 10
+                        Text {
+                            text: "ЗАВЕРШИТЬ ПРИЛОЖЕНИЕ"
+                            color: Theme.muted
+                            font.family: Theme.monoFont
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.1
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Jarvis найдёт процесс и покажет точное дерево перед завершением."
+                            color: Theme.text
+                            wrapMode: Text.WordWrap
+                            font.family: Theme.bodyFont
+                            font.pixelSize: 12
+                        }
+                        TextField {
+                            id: killField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 42
+                            leftPadding: 14
+                            rightPadding: 14
+                            color: Theme.text
+                            placeholderText: "Например, chrome"
+                            placeholderTextColor: "#7388B2"
+                            font.family: Theme.bodyFont
+                            font.pixelSize: 13
+                            Accessible.name: "Название процесса для завершения"
+                            background: Rectangle {
+                                radius: 11
+                                color: "#B4081734"
+                                border.width: killField.activeFocus ? 1.5 : 1
+                                border.color: killField.activeFocus ? Theme.accent : Theme.border
+                            }
+                            onAccepted: killButton.clicked()
+                        }
+                        ActionButton {
+                            id: killButton
+                            Layout.fillWidth: true
+                            text: "Найти процесс"
+                            enabled: killField.text.trim().length > 0 && !backend.busy
+                            onClicked: backend.runKill(killField.text)
+                        }
+                    }
+                }
+
+                GlassPanel {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 11
+                        Text {
+                            text: "ЗАЩИТА"
+                            color: Theme.muted
+                            font.family: Theme.monoFont
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.1
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Системные процессы Windows, NVIDIA, JARVIS, Steam, Epic Games Launcher и игровые процессы не закрываются."
+                            color: Theme.text
+                            wrapMode: Text.WordWrap
+                            font.family: Theme.bodyFont
+                            font.pixelSize: 12
+                            lineHeight: 1.25
+                        }
+                        Item { Layout.fillHeight: true }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 46
+                            radius: 12
+                            color: "#1E42D392"
+                            border.width: 1
+                            border.color: "#5942D392"
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 9
+                                Rectangle { width: 8; height: 8; radius: 4; color: Theme.success; anchors.verticalCenter: parent.verticalCenter }
+                                Text {
+                                    text: "Защита активна"
+                                    color: Theme.success
+                                    font.family: Theme.bodyFont
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

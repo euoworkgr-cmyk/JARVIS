@@ -155,6 +155,17 @@ def resource_directory() -> Path:
     return Path(__file__).resolve().parent
 
 
+def user_data_directory() -> Path:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return Path(local_app_data) / APP_NAME
+    return Path.home() / f".{APP_NAME.casefold()}"
+
+
+def program_index_path() -> Path:
+    return user_data_directory() / "programs.json"
+
+
 def notes_file_path() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent / "notes.json"
@@ -183,49 +194,44 @@ def save_notes(notes: list[str], path: Path | None = None) -> None:
 
 
 def get_program_map() -> dict[str, str]:
-    json_path = resource_directory() / "programs.json"
-    if not json_path.exists():
-        return {}
-
-    try:
-        with json_path.open("r", encoding="utf-8") as file:
-            data = json.load(file)
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-    if not isinstance(data, dict):
-        return {}
-    return {
-        str(name).lower(): str(app_id)
-        for name, app_id in data.items()
-        if name and app_id
-    }
+    paths = [program_index_path(), resource_directory() / "programs.json"]
+    for json_path in paths:
+        if not json_path.exists():
+            continue
+        try:
+            with json_path.open("r", encoding="utf-8") as file:
+                data = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict):
+            return {
+                str(name).lower(): str(app_id)
+                for name, app_id in data.items()
+                if name and app_id
+            }
+    return {}
 
 
 def generate_program_map() -> tuple[dict[str, str], str | None]:
-    if getattr(sys, "frozen", False):
-        return {}, "В сборке отсутствует список программ."
-
-    generator_path = resource_directory() / "get_programs.py"
-    if not generator_path.exists():
-        return {}, f"Не найден {generator_path.name}."
-
     try:
-        result = subprocess.run(
-            [sys.executable, str(generator_path)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=True,
-        )
-    except (OSError, subprocess.CalledProcessError) as error:
-        return {}, f"Не удалось обновить список: {error}"
+        from get_programs import get_installed_programs
 
-    program_map = get_program_map()
+        program_map = get_installed_programs()
+    except (ImportError, OSError, subprocess.SubprocessError) as error:
+        return {}, f"Не удалось обновить список: {error}"
     if not program_map:
-        detail = result.stderr.strip() or result.stdout.strip()
-        return {}, detail or "Генератор вернул пустой список."
+        return {}, "Windows не вернула установленные приложения."
+    path = program_index_path()
+    temporary = path.with_suffix(".json.tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(
+            json.dumps(program_map, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    except OSError as error:
+        return {}, f"Не удалось сохранить список: {error}"
     return program_map, None
 
 
