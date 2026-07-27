@@ -117,12 +117,13 @@ class CommandServiceTests(unittest.TestCase):
 
     @patch("command_service.assistant.execute_power_command")
     def test_power_command_requires_one_time_confirmation(self, execute_mock) -> None:
-        execute_mock.return_value = assistant.LaunchResult("success", "Перезагружаю компьютер")
+        execute_mock.return_value = assistant.LaunchResult("success", "Выключаю компьютер")
         with tempfile.TemporaryDirectory() as directory:
             service = self.make_service(Path(directory) / "history.json")
-            pending = service.execute("перезагрузка")
+            pending = service.execute("Выключи ПК")
 
             self.assertEqual(pending.status, "pending")
+            self.assertEqual(pending.data["kind"], "power")
             execute_mock.assert_not_called()
 
             completed = service.confirm(pending.data["pending_id"])
@@ -130,7 +131,9 @@ class CommandServiceTests(unittest.TestCase):
 
             self.assertEqual(completed.status, "success")
             self.assertEqual(repeated.status, "error")
-            execute_mock.assert_called_once()
+            execute_mock.assert_called_once_with(
+                assistant.PowerCommand("shutdown", 0)
+            )
 
     @patch("command_service.activate_game_mode")
     @patch("command_service.scan_named_processes")

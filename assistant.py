@@ -456,13 +456,20 @@ def extract_kill_target(command: str) -> str | None:
 
 
 def extract_power_command(command: str) -> PowerCommand | None:
-    value = " ".join(command.strip().casefold().split())
-    shutdown_match = re.fullmatch(r"выключить пк(?:\s*\(\s*(\d+)\s*\))?", value)
+    value = " ".join(command.strip().casefold().split()).rstrip(" .,!?:;")
+    shutdown_prefix = r"(?:выключи|выключить|выключите)\s+(?:пк|комп|компьютер)"
+    shutdown_match = re.fullmatch(
+        shutdown_prefix
+        + r"(?:\s*\(\s*(\d*)\s*\)|\s+через\s+(\d+)\s*(?:мин|минута|минуты|минут))?",
+        value,
+    )
     if shutdown_match:
-        minutes = int(shutdown_match.group(1) or 0)
+        minutes = int(shutdown_match.group(1) or shutdown_match.group(2) or 0)
         return PowerCommand("shutdown", minutes * 60)
-    if value.startswith("выключить пк"):
-        raise ValueError("Укажите время целым числом минут: выключить пк(30)")
+    if re.match(shutdown_prefix, value):
+        raise ValueError(
+            "Используйте «выключи пк» или укажите время: «выключи пк(30)»."
+        )
     if value in {"перезагрузка", "перезагрузить пк", "перезагрузить компьютер"}:
         return PowerCommand("restart")
     if value in {"спящий режим", "сон", "усыпить пк", "усыпить компьютер"}:

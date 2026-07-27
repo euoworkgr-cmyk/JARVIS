@@ -247,7 +247,7 @@ class SileroVoiceActivityDetector:
 class WhisperCppRecognizer:
     COMMAND_PROMPT = (
         "Команды голосового ассистента Supersonic (фраза пробуждения Джарвис): "
-        "открой, запусти, закрой, заверши, "
+        "открой, запусти, закрой, заверши, выключи ПК, "
         "Яндекс Браузер, Яндекс Музыка, Telegram, VS Code, ChatGPT, VPN, "
         "подтверждаю, отмена."
     )

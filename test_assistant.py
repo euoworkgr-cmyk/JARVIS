@@ -19,6 +19,22 @@ class AssistantSpecialCommandTests(unittest.TestCase):
             assistant.PowerCommand("shutdown", 0),
         )
 
+    def test_natural_shutdown_commands_are_recognized(self) -> None:
+        samples = {
+            "Выключи пк()": 0,
+            "Выключи ПК": 0,
+            "Выключи пк": 0,
+            "выключить компьютер": 0,
+            "выключи компьютер через 30 минут": 1800,
+        }
+
+        for text, delay_seconds in samples.items():
+            with self.subTest(text=text):
+                self.assertEqual(
+                    assistant.extract_power_command(text),
+                    assistant.PowerCommand("shutdown", delay_seconds),
+                )
+
     def test_restart_sleep_and_abort_power_commands(self) -> None:
         self.assertEqual(
             assistant.extract_power_command("перезагрузка"),
