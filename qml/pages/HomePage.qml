@@ -6,6 +6,7 @@ import "../components"
 
 Item {
     id: root
+    property bool animationEnabled: true
 
     RowLayout {
         anchors.fill: parent
@@ -284,6 +285,7 @@ Item {
             state: backend.jarvisState
             stateLabel: backend.stateLabel
             reducedMotion: backend.reducedMotion
+            animationEnabled: root.animationEnabled
         }
     }
 }

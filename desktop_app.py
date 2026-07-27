@@ -8,6 +8,7 @@ from PySide6.QtCore import QIODevice, QObject, QUrl, Signal
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from desktop_backend import DesktopBackend
@@ -95,6 +96,9 @@ def create_tray(backend: DesktopBackend, resources: Path) -> QSystemTrayIcon:
 
 def run_desktop_app() -> int:
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+    os.environ.setdefault("QSG_RENDER_LOOP", "basic")
+    if os.name == "nt":
+        QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Direct3D11)
     app = QApplication(sys.argv)
     app.setApplicationName("JARVIS")
     app.setApplicationDisplayName("JARVIS Desktop")

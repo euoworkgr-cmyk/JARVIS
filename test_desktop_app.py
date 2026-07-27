@@ -31,8 +31,18 @@ class DesktopAppSmokeTests(unittest.TestCase):
         self.assertEqual(len(engine.rootObjects()), 1)
         window = engine.rootObjects()[0]
         self.assertEqual(window.title(), "JARVIS Desktop")
+        self.assertEqual(window.color().alpha(), 255)
         backend._quitting = True
         window.close()
+
+    def test_jarvis_core_has_no_per_frame_canvas_repaint(self) -> None:
+        root = Path(__file__).resolve().parent
+        source = (root / "qml" / "components" / "JarvisCore.qml").read_text(encoding="utf-8")
+
+        self.assertNotIn("Canvas {", source)
+        self.assertNotIn("requestPaint", source)
+        self.assertIn("layer.enabled: true", source)
+        self.assertIn("RotationAnimator", source)
 
     def test_second_instance_notifies_existing_server(self) -> None:
         name = f"JARVIS.Desktop.Test.{uuid.uuid4().hex}"

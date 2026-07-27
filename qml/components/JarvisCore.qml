@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import ".."
 
 Item {
@@ -6,7 +7,7 @@ Item {
     property string state: "idle"
     property string stateLabel: "Готов к работе"
     property bool reducedMotion: false
-    property real phase: 0
+    property bool animationEnabled: true
 
     readonly property color semanticColor: state === "error" ? Theme.danger
                                                  : state === "success" ? Theme.success
@@ -53,33 +54,98 @@ Item {
             opacity: 0.74
         }
 
-        Canvas {
-            id: arcCanvas
+        Shape {
+            id: outerArc
             anchors.fill: parent
-            opacity: 0.78
-            onPaint: {
-                const ctx = getContext("2d")
-                ctx.reset()
-                const center = width / 2
-                const radians = Math.PI / 180
-                ctx.lineCap = "round"
-                ctx.lineWidth = 3
-                ctx.strokeStyle = root.semanticColor
-                ctx.shadowColor = root.semanticColor
-                ctx.shadowBlur = 12
-                ctx.beginPath()
-                ctx.arc(center, center, width * 0.43, (root.phase + 18) * radians, (root.phase + 102) * radians)
-                ctx.stroke()
-                ctx.lineWidth = 1.5
-                ctx.beginPath()
-                ctx.arc(center, center, width * 0.31, (-root.phase + 205) * radians, (-root.phase + 284) * radians)
-                ctx.stroke()
+            layer.enabled: true
+            layer.smooth: true
+
+            ShapePath {
+                strokeColor: Qt.rgba(root.semanticColor.r, root.semanticColor.g, root.semanticColor.b, 0.18)
+                strokeWidth: 11
+                capStyle: ShapePath.RoundCap
+                fillColor: "transparent"
+                PathAngleArc {
+                    centerX: outerArc.width / 2
+                    centerY: outerArc.height / 2
+                    radiusX: outerArc.width * 0.43
+                    radiusY: outerArc.height * 0.43
+                    startAngle: 18
+                    sweepAngle: 84
+                }
             }
-            Connections {
-                target: root
-                function onPhaseChanged() { arcCanvas.requestPaint() }
-                function onSemanticColorChanged() { arcCanvas.requestPaint() }
+
+            ShapePath {
+                strokeColor: root.semanticColor
+                strokeWidth: 3
+                capStyle: ShapePath.RoundCap
+                fillColor: "transparent"
+                PathAngleArc {
+                    centerX: outerArc.width / 2
+                    centerY: outerArc.height / 2
+                    radiusX: outerArc.width * 0.43
+                    radiusY: outerArc.height * 0.43
+                    startAngle: 18
+                    sweepAngle: 84
+                }
             }
+
+            RotationAnimator {
+                target: outerArc
+                from: 0
+                to: 360
+                duration: 2600
+                loops: Animation.Infinite
+                running: root.animationEnabled && !root.reducedMotion && root.state === "working"
+            }
+
+        }
+
+        Shape {
+            id: innerArc
+            anchors.fill: parent
+            layer.enabled: true
+            layer.smooth: true
+
+            ShapePath {
+                strokeColor: Qt.rgba(root.semanticColor.r, root.semanticColor.g, root.semanticColor.b, 0.13)
+                strokeWidth: 7
+                capStyle: ShapePath.RoundCap
+                fillColor: "transparent"
+                PathAngleArc {
+                    centerX: innerArc.width / 2
+                    centerY: innerArc.height / 2
+                    radiusX: innerArc.width * 0.31
+                    radiusY: innerArc.height * 0.31
+                    startAngle: 205
+                    sweepAngle: 79
+                }
+            }
+
+            ShapePath {
+                strokeColor: root.semanticColor
+                strokeWidth: 1.5
+                capStyle: ShapePath.RoundCap
+                fillColor: "transparent"
+                PathAngleArc {
+                    centerX: innerArc.width / 2
+                    centerY: innerArc.height / 2
+                    radiusX: innerArc.width * 0.31
+                    radiusY: innerArc.height * 0.31
+                    startAngle: 205
+                    sweepAngle: 79
+                }
+            }
+
+            RotationAnimator {
+                target: innerArc
+                from: 0
+                to: -360
+                duration: 3400
+                loops: Animation.Infinite
+                running: root.animationEnabled && !root.reducedMotion && root.state === "working"
+            }
+
         }
 
         scale: root.state === "working" ? 1.025 : 1.0
@@ -87,14 +153,6 @@ Item {
             enabled: !root.reducedMotion
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
-    }
-
-    NumberAnimation on phase {
-        from: 0
-        to: 360
-        duration: root.state === "working" ? 2800 : 10500
-        loops: Animation.Infinite
-        running: !root.reducedMotion
     }
 
     Rectangle {

@@ -13,9 +13,10 @@ ApplicationWindow {
     minimumWidth: 960
     minimumHeight: 620
     visible: false
-    color: "transparent"
+    color: Theme.backgroundDeep
     flags: Qt.Window | Qt.FramelessWindowHint
     title: "JARVIS Desktop"
+    property bool windowMoving: false
 
     onClosing: function(close) {
         if (!backend.quitting) {
@@ -207,7 +208,11 @@ ApplicationWindow {
             DragHandler {
                 target: null
                 grabPermissions: PointerHandler.CanTakeOverFromAnything
-                onActiveChanged: if (active && window.visibility !== Window.Maximized) window.startSystemMove()
+                onActiveChanged: {
+                    window.windowMoving = active
+                    if (active && window.visibility !== Window.Maximized)
+                        window.startSystemMove()
+                }
             }
             TapHandler {
                 acceptedButtons: Qt.LeftButton
@@ -278,7 +283,11 @@ ApplicationWindow {
                             : backend.currentPage === "game" ? 2
                             : backend.currentPage === "notes" ? 3 : 0
 
-                HomePage { }
+                HomePage {
+                    animationEnabled: window.visible
+                                      && window.visibility !== Window.Minimized
+                                      && !window.windowMoving
+                }
                 AppsPage { }
                 GamePage { }
                 NotesPage { }
@@ -636,13 +645,6 @@ ApplicationWindow {
             source: Qt.resolvedUrl("../assets/pet/" + petWindow.sprite + ".png")
             fillMode: Image.PreserveAspectFit
             smooth: false
-
-            SequentialAnimation on y {
-                running: !backend.reducedMotion && !petDrag.active
-                loops: Animation.Infinite
-                NumberAnimation { from: 0; to: -2; duration: 540; easing.type: Easing.InOutSine }
-                NumberAnimation { from: -2; to: 0; duration: 540; easing.type: Easing.InOutSine }
-            }
 
             TapHandler {
                 onTapped: {
