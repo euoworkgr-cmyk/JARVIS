@@ -363,7 +363,11 @@ class CommandService:
                 return CommandOutcome("not_found", "После kill нужно название программы", "Например: kill chrome")
             scan = scan_named_processes(assistant.normalize_kill_target(kill_target))
             if not scan.candidates:
-                return CommandOutcome("not_found", f"Не нашёл запущенный процесс «{kill_target}»")
+                return CommandOutcome(
+                    "not_found",
+                    f"Не нашёл запущенный процесс «{kill_target}»",
+                    data={"candidates": []},
+                )
             return self._pending_outcome(
                 "kill",
                 command,
@@ -377,7 +381,12 @@ class CommandService:
         if lowered in assistant.GAME_MODE_COMMANDS:
             scan = scan_game_mode()
             if not scan.candidates:
-                return CommandOutcome("success", "Закрывать нечего", scan.warning or "Заметной GPU-нагрузки нет.")
+                return CommandOutcome(
+                    "success",
+                    "Закрывать нечего",
+                    scan.warning or "Заметной GPU-нагрузки нет.",
+                    {"candidates": [], "warning": scan.warning},
+                )
             return self._pending_outcome(
                 "game_mode",
                 command,

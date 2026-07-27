@@ -167,6 +167,28 @@ class CommandServiceTests(unittest.TestCase):
             self.assertEqual(result.status, "success")
             activate_mock.assert_called_once_with(scan_mock.return_value, force=False)
 
+    @patch("command_service.scan_game_mode")
+    def test_empty_game_scan_clears_previous_candidates(self, scan_mock) -> None:
+        scan_mock.return_value = GameModeScan([], True, "")
+        with tempfile.TemporaryDirectory() as directory:
+            service = self.make_service(Path(directory) / "history.json")
+
+            outcome = service.execute("/game")
+
+        self.assertEqual(outcome.status, "success")
+        self.assertEqual(outcome.data["candidates"], [])
+
+    @patch("command_service.scan_named_processes")
+    def test_empty_kill_scan_clears_previous_candidates(self, scan_mock) -> None:
+        scan_mock.return_value = GameModeScan([], False, "")
+        with tempfile.TemporaryDirectory() as directory:
+            service = self.make_service(Path(directory) / "history.json")
+
+            outcome = service.execute("kill chrome")
+
+        self.assertEqual(outcome.status, "not_found")
+        self.assertEqual(outcome.data["candidates"], [])
+
     def test_clear_history_requires_confirmation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             service = self.make_service(Path(directory) / "history.json")
