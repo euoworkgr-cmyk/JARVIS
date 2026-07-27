@@ -33,6 +33,24 @@ Canvas {
             c.moveTo(3.5, 11); c.lineTo(12, 4); c.lineTo(20.5, 11)
             c.moveTo(5.8, 9.8); c.lineTo(5.8, 20); c.lineTo(18.2, 20); c.lineTo(18.2, 9.8)
             c.moveTo(9.5, 20); c.lineTo(9.5, 14); c.lineTo(14.5, 14); c.lineTo(14.5, 20)
+        } else if (name === "notes") {
+            c.rect(5, 3.5, 14, 17)
+            c.moveTo(8.5, 8); c.lineTo(15.5, 8)
+            c.moveTo(8.5, 12); c.lineTo(15.5, 12)
+            c.moveTo(8.5, 16); c.lineTo(13.5, 16)
+        } else if (name === "edit") {
+            c.moveTo(5, 19); c.lineTo(8.8, 18.2); c.lineTo(18.5, 8.5)
+            c.lineTo(15.5, 5.5); c.lineTo(5.8, 15.2); c.closePath()
+            c.moveTo(14.5, 6.5); c.lineTo(17.5, 9.5)
+        } else if (name === "delete") {
+            c.moveTo(5, 7); c.lineTo(19, 7)
+            c.moveTo(9, 4); c.lineTo(15, 4); c.lineTo(16, 7)
+            c.moveTo(7, 7); c.lineTo(8, 20); c.lineTo(16, 20); c.lineTo(17, 7)
+            c.moveTo(10, 10); c.lineTo(10.5, 17)
+            c.moveTo(14, 10); c.lineTo(13.5, 17)
+        } else if (name === "plus") {
+            c.moveTo(12, 5); c.lineTo(12, 19)
+            c.moveTo(5, 12); c.lineTo(19, 12)
         } else if (name === "statistics") {
             c.moveTo(4, 20); c.lineTo(20, 20)
             c.moveTo(6, 17); c.lineTo(6, 12); c.lineTo(9, 12); c.lineTo(9, 17)

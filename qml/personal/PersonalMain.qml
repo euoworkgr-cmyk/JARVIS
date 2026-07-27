@@ -18,6 +18,8 @@ ApplicationWindow {
     property bool windowMoving: false
 
     function pageComponent(page) {
+        if (page === "notes")
+            return notesPageComponent
         if (page === "statistics")
             return statisticsPageComponent
         if (page === "customization")
@@ -224,6 +226,12 @@ ApplicationWindow {
                     onClicked: backend.setPage("home")
                 }
                 PersonalNavButton {
+                    iconName: "notes"
+                    label: "Заметки"
+                    selected: backend.currentPage === "notes"
+                    onClicked: backend.setPage("notes")
+                }
+                PersonalNavButton {
                     iconName: "statistics"
                     label: "Статистика"
                     selected: backend.currentPage === "statistics"
@@ -248,6 +256,10 @@ ApplicationWindow {
         Component {
             id: homePageComponent
             PersonalHomePage { property string pageKey: "home" }
+        }
+        Component {
+            id: notesPageComponent
+            PersonalNotesPage { property string pageKey: "notes" }
         }
         Component {
             id: statisticsPageComponent
