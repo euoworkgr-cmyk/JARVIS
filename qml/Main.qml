@@ -628,12 +628,14 @@ ApplicationWindow {
 
     Window {
         id: petWindow
+        objectName: "petWindow"
         width: 128
         height: 128
         x: backend.petX
         y: backend.petY
         visible: backend.petVisible
         color: "transparent"
+        transientParent: null
         flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
         title: "JARVIS Pet"
         property string sprite: "idle"

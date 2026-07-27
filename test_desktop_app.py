@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuick import QQuickWindow
 from PySide6.QtWidgets import QApplication
 
 from desktop_backend import DesktopBackend
@@ -32,6 +33,9 @@ class DesktopAppSmokeTests(unittest.TestCase):
         window = engine.rootObjects()[0]
         self.assertEqual(window.title(), "JARVIS Desktop")
         self.assertEqual(window.color().alpha(), 255)
+        pet_window = window.findChild(QQuickWindow, "petWindow")
+        self.assertIsNotNone(pet_window)
+        self.assertIsNone(pet_window.transientParent())
         backend._quitting = True
         window.close()
 
