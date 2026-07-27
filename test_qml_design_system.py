@@ -36,8 +36,9 @@ def blocks(source: str, component: str) -> list[str]:
 
 class QmlDesignSystemTests(unittest.TestCase):
     def test_only_six_pixel_size_roles_are_used(self) -> None:
+        forbidden_size_property = "font." + "point" + "Size"
         for path, source in qml_sources().items():
-            self.assertNotIn("font.pointSize", source, path)
+            self.assertNotIn(forbidden_size_property, source, path)
             for value in re.findall(r"font\.pixelSize:\s*([^\r\n]+)", source):
                 normalized = value.strip().rstrip("}").strip()
                 match = re.fullmatch(r"(?:Theme|PersonalTheme)\.(\w+)", normalized)
