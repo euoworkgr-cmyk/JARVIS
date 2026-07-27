@@ -29,11 +29,11 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        Text {
+                        LabelSmooth {
                             text: "ИСТОРИЯ КОМАНД"
                             color: Theme.text
                             font.family: Theme.headingFont
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.title
                             font.weight: Font.DemiBold
                             font.letterSpacing: 0.7
                         }
@@ -43,12 +43,12 @@ Item {
                             height: 26
                             radius: 13
                             color: "#182B5A"
-                            Text {
+                            LabelSharp {
                                 anchors.centerIn: parent
                                 text: backend.historyItems.length + " / 100"
                                 color: Theme.muted
                                 font.family: Theme.monoFont
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.micro
                             }
                         }
                     }
@@ -67,20 +67,20 @@ Item {
                             visible: backend.historyItems.length === 0
                             anchors.centerIn: parent
                             spacing: 8
-                            Text {
+                            LabelSmooth {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "Команд пока нет"
                                 color: Theme.text
                                 font.family: Theme.bodyFont
-                                font.pixelSize: 17
+                                font.pixelSize: Theme.title
                                 font.weight: Font.DemiBold
                             }
-                            Text {
+                            LabelSharp {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "Введите название программы или команду ниже."
                                 color: Theme.muted
                                 font.family: Theme.bodyFont
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.body
                             }
                         }
 
@@ -100,12 +100,54 @@ Item {
                             delegate: Rectangle {
                                 id: historyCard
                                 required property var modelData
-                                width: historyList.width - 12
+                                required property int index
+                                width: Math.round(historyList.width - 12)
                                 height: 70
                                 radius: 13
-                                color: hover.hovered ? "#C0162C59" : "#9B0B1937"
+                                color: historyTap.pressed ? Theme.backgroundDeep
+                                                          : hover.hovered ? Theme.panelHover
+                                                                          : Theme.panel
                                 border.width: 1
                                 border.color: hover.hovered ? Theme.borderStrong : "#345B82BC"
+                                opacity: Theme.reducedMotion ? 1 : 0
+                                scale: historyTap.pressed ? 0.97
+                                                          : hover.hovered ? 1.015 : 1
+
+                                transform: Translate {
+                                    id: historyReveal
+                                    x: Theme.reducedMotion ? 0 : -8
+                                }
+
+                                Behavior on scale {
+                                    NumberAnimation {
+                                        duration: Theme.durFast
+                                        easing.type: Theme.easeOut
+                                    }
+                                }
+                                Behavior on color {
+                                    ColorAnimation { duration: Theme.durFast }
+                                }
+
+                                SequentialAnimation {
+                                    running: true
+                                    PauseAnimation { duration: index * Theme.staggerStep }
+                                    ParallelAnimation {
+                                        NumberAnimation {
+                                            target: historyCard
+                                            property: "opacity"
+                                            to: 1
+                                            duration: Theme.durBase
+                                            easing.type: Theme.easeOut
+                                        }
+                                        NumberAnimation {
+                                            target: historyReveal
+                                            property: "x"
+                                            to: 0
+                                            duration: Theme.durBase
+                                            easing.type: Theme.easeOut
+                                        }
+                                    }
+                                }
 
                                 readonly property color statusColor: modelData.status === "success" ? Theme.success
                                                                            : modelData.status === "error" || modelData.status === "not_found" ? Theme.danger
@@ -113,6 +155,7 @@ Item {
                                                                            : Theme.accent
 
                                 HoverHandler { id: hover }
+                                TapHandler { id: historyTap }
 
                                 Rectangle {
                                     width: 3
@@ -131,22 +174,22 @@ Item {
                                     anchors.rightMargin: 10
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: 4
-                                    Text {
+                                    LabelSmooth {
                                         width: parent.width
                                         text: modelData.command
                                         color: Theme.text
                                         elide: Text.ElideRight
                                         font.family: Theme.monoFont
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.label
                                         font.weight: Font.DemiBold
                                     }
-                                    Text {
+                                    LabelSmooth {
                                         width: parent.width
                                         text: modelData.title + (modelData.detail ? "  ·  " + modelData.detail : "")
                                         color: Theme.muted
                                         elide: Text.ElideRight
                                         font.family: Theme.bodyFont
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.label
                                     }
                                 }
 
@@ -161,11 +204,11 @@ Item {
                                     anchors.verticalCenter: parent.verticalCenter
                                     Accessible.role: Accessible.Button
                                     Accessible.name: "Удалить запись из истории"
-                                    Text {
+                                    LabelSmooth {
                                         anchors.centerIn: parent
                                         text: "×"
                                         color: removeHover.hovered ? Theme.danger : Theme.muted
-                                        font.pixelSize: 19
+                                        font.pixelSize: Theme.title
                                     }
                                     HoverHandler { id: removeHover }
                                     TapHandler { onTapped: backend.removeHistory(modelData.id) }
@@ -201,14 +244,25 @@ Item {
                             placeholderText: "Что запустить?"
                             placeholderTextColor: "#7388B2"
                             font.family: Theme.bodyFont
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.title
+                            renderType: Text.QtRendering
                             enabled: !backend.busy
                             Accessible.name: "Команда JARVIS"
                             background: Rectangle {
                                 radius: 13
                                 color: "#CC06132E"
-                                border.width: commandField.activeFocus ? 1.5 : 1
+                                border.width: commandField.activeFocus ? 2 : 1
                                 border.color: commandField.activeFocus ? Theme.accent : Theme.border
+
+                                Behavior on border.width {
+                                    NumberAnimation {
+                                        duration: Theme.durFocus
+                                        easing.type: Theme.easeOut
+                                    }
+                                }
+                                Behavior on border.color {
+                                    ColorAnimation { duration: Theme.durFocus }
+                                }
                             }
                             onAccepted: {
                                 if (text.trim().length > 0) {
@@ -226,12 +280,12 @@ Item {
                             color: backend.busy ? "#27477D" : (sendHover.hovered ? Theme.accent : Theme.primary)
                             Accessible.role: Accessible.Button
                             Accessible.name: "Выполнить команду"
-                            Text {
+                            LabelSmooth {
                                 anchors.centerIn: parent
                                 text: backend.busy ? "···" : "→"
                                 color: Theme.text
                                 font.family: Theme.headingFont
-                                font.pixelSize: backend.busy ? 16 : 22
+                                font.pixelSize: Theme.title
                                 font.weight: Font.DemiBold
                             }
                             HoverHandler { id: sendHover }
@@ -244,29 +298,29 @@ Item {
 
                     Row {
                         spacing: 14
-                        Text {
+                        LabelSharp {
                             text: "/help"
                             color: Theme.accent
                             font.family: Theme.monoFont
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.micro
                         }
-                        Text {
+                        LabelSharp {
                             text: "/apps"
                             color: Theme.muted
                             font.family: Theme.monoFont
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.micro
                         }
-                        Text {
+                        LabelSharp {
                             text: "/game"
                             color: Theme.muted
                             font.family: Theme.monoFont
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.micro
                         }
-                        Text {
+                        LabelSharp {
                             text: "Ctrl + K — перейти к команде"
                             color: "#657AA4"
                             font.family: Theme.bodyFont
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.micro
                         }
                     }
                 }
@@ -284,7 +338,7 @@ Item {
             Layout.minimumWidth: 320
             state: backend.jarvisState
             stateLabel: backend.stateLabel
-            reducedMotion: backend.reducedMotion
+            reducedMotion: Theme.reducedMotion
             animationEnabled: root.animationEnabled
         }
     }

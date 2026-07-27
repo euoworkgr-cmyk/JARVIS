@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "."
+import ".." as Shared
 
 Button {
     id: root
@@ -29,7 +30,7 @@ Button {
                                        : root.selected ? PersonalTheme.borderStrong : "transparent"
 
         Behavior on color {
-            ColorAnimation { duration: PersonalTheme.motionFast }
+            ColorAnimation { duration: PersonalTheme.durFast }
         }
 
     }
@@ -101,11 +102,11 @@ Button {
             }
         }
 
-        Text {
+        Shared.LabelSharp {
             text: root.label
             color: root.selected ? PersonalTheme.text : PersonalTheme.muted
             font.family: PersonalTheme.bodyFont
-            font.pixelSize: 13
+            font.pixelSize: PersonalTheme.body
             font.weight: root.selected ? Font.DemiBold : Font.Normal
             Layout.fillWidth: true
             verticalAlignment: Text.AlignVCenter

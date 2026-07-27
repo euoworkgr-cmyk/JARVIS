@@ -13,11 +13,19 @@ Button {
     rightPadding: 18
     Accessible.name: accessibleName
 
-    contentItem: Text {
+    scale: root.down ? 0.97 : root.hovered ? 1.015 : 1
+    Behavior on scale {
+        NumberAnimation {
+            duration: Theme.durFast
+            easing.type: Theme.easeOut
+        }
+    }
+
+    contentItem: LabelSmooth {
         text: root.text
         color: Theme.text
         font.family: Theme.bodyFont
-        font.pixelSize: 13
+        font.pixelSize: Theme.body
         font.weight: root.accent ? Font.DemiBold : Font.Normal
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -31,6 +39,6 @@ Button {
              : root.hovered ? "#263D70" : "#192B51"
         border.width: root.accent ? 0 : 1
         border.color: root.danger ? "#70FF5D6C" : Theme.border
-        Behavior on color { ColorAnimation { duration: 160 } }
+        Behavior on color { ColorAnimation { duration: Theme.durFast } }
     }
 }

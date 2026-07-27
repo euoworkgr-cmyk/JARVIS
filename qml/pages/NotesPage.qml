@@ -15,19 +15,22 @@ Item {
             Layout.fillWidth: true
             Column {
                 spacing: 3
-                Text {
+                LabelSmooth {
                     text: "ЗАМЕТКИ"
                     color: Theme.text
                     font.family: Theme.headingFont
-                    font.pixelSize: 25
+                    font.pixelSize: Theme.hero
                     font.weight: Font.DemiBold
                     font.letterSpacing: 0.8
                 }
-                Text {
+                LabelSharp {
                     text: backend.noteItems.length + " заметок · хранятся только на этом компьютере"
                     color: Theme.muted
                     font.family: Theme.bodyFont
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.body
+                    renderType: Text.NativeRendering
+                    lineHeightMode: Text.ProportionalHeight
+                    lineHeight: Theme.lineHeightRelaxed
                 }
             }
             Item { Layout.fillWidth: true }
@@ -61,13 +64,21 @@ Item {
                     placeholderTextColor: "#7388B2"
                     wrapMode: TextEdit.Wrap
                     font.family: Theme.bodyFont
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.body
+                    renderType: Text.NativeRendering
                     Accessible.name: "Новая заметка"
                     background: Rectangle {
                         radius: 13
                         color: "#B4081734"
-                        border.width: newNote.activeFocus ? 1.5 : 1
+                        border.width: newNote.activeFocus ? 2 : 1
                         border.color: newNote.activeFocus ? Theme.accent : Theme.border
+
+                        Behavior on border.width {
+                            NumberAnimation { duration: Theme.durFocus; easing.type: Theme.easeOut }
+                        }
+                        Behavior on border.color {
+                            ColorAnimation { duration: Theme.durFocus }
+                        }
                     }
                     Keys.onPressed: function(event) {
                         if (event.key === Qt.Key_Return && (event.modifiers & Qt.ControlModifier)) {
@@ -118,20 +129,20 @@ Item {
                             sourceSize.height: 25
                         }
                     }
-                    Text {
+                    LabelSmooth {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: "Заметок пока нет"
                         color: Theme.text
                         font.family: Theme.bodyFont
-                        font.pixelSize: 16
+                        font.pixelSize: Theme.title
                         font.weight: Font.DemiBold
                     }
-                    Text {
+                    LabelSharp {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: "Добавьте первую заметку в поле выше."
                         color: Theme.muted
                         font.family: Theme.bodyFont
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.label
                     }
                 }
 
@@ -157,13 +168,12 @@ Item {
                         border.color: editing ? Theme.accent : (noteHover.hovered ? Theme.borderStrong : Theme.border)
 
                         Behavior on height {
-                            enabled: !backend.reducedMotion
-                            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                            NumberAnimation { duration: Theme.durFocus; easing.type: Theme.easeOut }
                         }
 
                         HoverHandler { id: noteHover }
 
-                        Text {
+                        LabelSharp {
                             visible: !noteCard.editing
                             anchors.left: parent.left
                             anchors.leftMargin: 18
@@ -176,7 +186,10 @@ Item {
                             maximumLineCount: 2
                             wrapMode: Text.WordWrap
                             font.family: Theme.bodyFont
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.body
+                            renderType: Text.NativeRendering
+                            lineHeightMode: Text.ProportionalHeight
+                            lineHeight: Theme.lineHeightRelaxed
                         }
 
                         TextArea {
@@ -193,7 +206,8 @@ Item {
                             color: Theme.text
                             wrapMode: TextEdit.Wrap
                             font.family: Theme.bodyFont
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.body
+                            renderType: Text.NativeRendering
                             background: Rectangle {
                                 radius: 10
                                 color: "#C507142E"
@@ -283,22 +297,22 @@ Item {
             anchors.fill: parent
             anchors.margins: 24
             spacing: 13
-            Text {
+            LabelSmooth {
                 Layout.fillWidth: true
                 text: "Очистить все заметки?"
                 color: Theme.text
                 wrapMode: Text.WordWrap
                 font.family: Theme.headingFont
-                font.pixelSize: 21
+                font.pixelSize: Theme.hero
                 font.weight: Font.DemiBold
             }
-            Text {
+            LabelSharp {
                 Layout.fillWidth: true
                 text: "Это действие удалит все локальные заметки без возможности восстановления."
                 color: Theme.muted
                 wrapMode: Text.WordWrap
                 font.family: Theme.bodyFont
-                font.pixelSize: 13
+                font.pixelSize: Theme.body
             }
             Item { Layout.fillHeight: true }
             RowLayout {

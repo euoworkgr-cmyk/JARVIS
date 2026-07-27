@@ -740,6 +740,11 @@ class DesktopBackend(QObject):
     def refreshPrograms(self) -> None:
         self._run_task(self.service.refresh_programs, self._programs_refreshed)
 
+    def shutdown_workers(self, timeout_ms: int = -1) -> None:
+        """Wait for active QRunnables before Qt tears down their signal objects."""
+        self._stats_timer.stop()
+        self.thread_pool.waitForDone(timeout_ms)
+
     def _programs_refreshed(self, outcome: CommandOutcome) -> None:
         self.programsChanged.emit()
         self._handle_outcome(outcome)
@@ -845,6 +850,7 @@ class DesktopBackend(QObject):
         self._quitting = True
         self.quittingChanged.emit()
         self.quitRequested.emit()
+        self.shutdown_workers()
         app = QGuiApplication.instance()
         if app is not None:
             app.quit()

@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import ".." as Shared
 
 QtObject {
     // The personal shell consumes semantic tokens only. Future themes can replace
@@ -26,9 +27,18 @@ QtObject {
     readonly property color warning: "#D7B56F"
     readonly property color danger: "#D9827D"
 
-    readonly property string displayFont: "Georgia"
-    readonly property string bodyFont: "Segoe UI"
-    readonly property string utilityFont: "Consolas"
+    readonly property string displayFont: Shared.Theme.displayFont
+    readonly property string bodyFont: Shared.Theme.bodyFont
+    readonly property string utilityFont: Shared.Theme.bodyFont
+
+    readonly property int hero: Shared.Theme.hero
+    readonly property int title: Shared.Theme.title
+    readonly property int body: Shared.Theme.body
+    readonly property int label: Shared.Theme.label
+    readonly property int caption: Shared.Theme.caption
+    readonly property int micro: Shared.Theme.micro
+    readonly property real lineHeightTight: Shared.Theme.lineHeightTight
+    readonly property real lineHeightRelaxed: Shared.Theme.lineHeightRelaxed
 
     readonly property int radiusSmall: 8
     readonly property int radiusMedium: 12
@@ -36,6 +46,12 @@ QtObject {
     readonly property int spacingSmall: 8
     readonly property int spacingMedium: 16
     readonly property int spacingLarge: 24
-    readonly property int motionFast: 140
-    readonly property int motionMedium: 220
+    readonly property int durFast: Shared.Theme.durFast
+    readonly property int durBase: Shared.Theme.durBase
+    readonly property int durSlow: Shared.Theme.durSlow
+    readonly property int durFocus: Shared.Theme.durFocus
+    readonly property int durProgress: Shared.Theme.durProgress
+    readonly property int durPulse: Shared.Theme.durPulse
+    readonly property int staggerStep: Shared.Theme.staggerStep
+    readonly property int easeOut: Shared.Theme.easeOut
 }

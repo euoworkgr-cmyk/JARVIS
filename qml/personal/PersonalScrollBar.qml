@@ -17,10 +17,10 @@ ScrollBar {
         opacity: control.policy === ScrollBar.AlwaysOff || control.size >= 1 ? 0 : 1
 
         Behavior on color {
-            ColorAnimation { duration: PersonalTheme.motionFast }
+            ColorAnimation { duration: PersonalTheme.durFast }
         }
         Behavior on opacity {
-            NumberAnimation { duration: PersonalTheme.motionFast }
+            NumberAnimation { duration: PersonalTheme.durFast }
         }
     }
 

@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 import sys
 
-from PySide6.QtCore import QFileInfo, QIODevice, QObject, QSize, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QIcon, QPixmap, QWindow
+from PySide6.QtCore import QFileInfo, QIODevice, QObject, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QFont, QFontDatabase, QGuiApplication, QIcon, QPixmap, QWindow
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickImageProvider, QQuickWindow, QSGRendererInterface
@@ -142,7 +142,18 @@ def run_desktop_app(
     os.environ.setdefault("QSG_RENDER_LOOP", "basic")
     if os.name == "nt":
         QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Direct3D11)
+
+    QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
     app = QApplication(sys.argv)
+    available_families = set(QFontDatabase.families())
+    ui_font_family = (
+        "Segoe UI Variable"
+        if "Segoe UI Variable" in available_families
+        else "Segoe UI"
+    )
+    app.setFont(QFont(ui_font_family))
     app.setApplicationName("JARVIS")
     app.setApplicationDisplayName("JARVIS Desktop")
     app.setOrganizationName("JARVIS")
@@ -189,6 +200,7 @@ def run_desktop_app(
     )
 
     exit_code = app.exec()
+    backend.shutdown_workers()
     tray.hide()
     return exit_code
 

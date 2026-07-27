@@ -85,6 +85,15 @@ class DesktopAppSmokeTests(unittest.TestCase):
         self.assertIn("layer.enabled: true", source)
         self.assertIn("RotationAnimator", source)
 
+    def test_shutdown_waits_for_background_workers(self) -> None:
+        backend = DesktopBackend(Path(__file__).resolve().parent)
+        pool = MagicMock()
+        backend.thread_pool = pool
+
+        backend.shutdown_workers(750)
+
+        pool.waitForDone.assert_called_once_with(750)
+
     @patch("desktop_backend.QTimer.singleShot")
     @patch("desktop_backend.get_work_areas", return_value=[])
     @patch("desktop_backend.reduced_motion_enabled", return_value=True)

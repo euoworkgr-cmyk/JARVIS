@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import "."
+import ".." as Shared
 
 ApplicationWindow {
     id: window
@@ -16,6 +17,30 @@ ApplicationWindow {
     title: "JARVIS Personal"
     property bool windowMoving: false
 
+    function pageComponent(page) {
+        if (page === "statistics")
+            return statisticsPageComponent
+        if (page === "customization")
+            return customizationPageComponent
+        if (page === "settings")
+            return settingsPageComponent
+        return homePageComponent
+    }
+
+    function showPage(page) {
+        const component = pageComponent(page)
+        if (pageStack.currentItem && pageStack.currentItem.pageKey === page)
+            return
+        pageStack.replace(
+            pageStack.currentItem,
+            component,
+            {},
+            StackView.PushTransition
+        )
+    }
+
+    Component.onCompleted: Shared.Theme.reducedMotion = backend.reducedMotion
+
     onClosing: function(close) {
         if (!backend.quitting) {
             close.accepted = false
@@ -26,6 +51,7 @@ ApplicationWindow {
     Connections {
         target: backend
         function onHelpRequested() { backend.setPage("settings") }
+        function onCurrentPageChanged() { window.showPage(backend.currentPage) }
         function onPendingActionChanged() {
             if (backend.pendingAction.pending_id)
                 confirmPopup.open()
@@ -93,11 +119,11 @@ ApplicationWindow {
                 }
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
-                    Text {
+                    Shared.LabelSharp {
                         text: "Голосовой помощник"
                         color: PersonalTheme.text
                         font.family: PersonalTheme.bodyFont
-                        font.pixelSize: 13
+                        font.pixelSize: PersonalTheme.body
                     }
                 }
             }
@@ -123,12 +149,12 @@ ApplicationWindow {
                                : "transparent"
                         Accessible.role: Accessible.Button
                         Accessible.name: modelData.label
-                        Text {
+                        Shared.LabelSmooth {
                             anchors.centerIn: parent
                             text: modelData.symbol
                             color: PersonalTheme.muted
                             font.family: PersonalTheme.bodyFont
-                            font.pixelSize: modelData.action === "close" ? 20 : 16
+                            font.pixelSize: PersonalTheme.title
                         }
                         HoverHandler { id: buttonHover }
                         TapHandler {
@@ -211,7 +237,30 @@ ApplicationWindow {
 
         }
 
-        StackLayout {
+        Component {
+            id: homePageComponent
+            PersonalHomePage { property string pageKey: "home" }
+        }
+        Component {
+            id: statisticsPageComponent
+            PersonalStatisticsPage { property string pageKey: "statistics" }
+        }
+        Component {
+            id: customizationPageComponent
+            PersonalPlaceholderPage {
+                property string pageKey: "customization"
+                pageTitle: "Кастомизация"
+                pageDescription: "Здесь появятся темы, фоновые рисунки и параметры визуального поведения. Структура personal-версии уже отделена от палитры, поэтому новые темы не потребуют переделки экранов."
+                symbol: "◌"
+            }
+        }
+        Component {
+            id: settingsPageComponent
+            PersonalSettingsPage { property string pageKey: "settings" }
+        }
+
+        StackView {
+            id: pageStack
             anchors.left: sidebar.right
             anchors.right: parent.right
             anchors.top: titleBar.bottom
@@ -220,21 +269,44 @@ ApplicationWindow {
             anchors.rightMargin: 30
             anchors.topMargin: 20
             anchors.bottomMargin: 20
-            currentIndex: backend.currentPage === "statistics" ? 1
-                        : backend.currentPage === "customization" ? 2
-                        : backend.currentPage === "settings" ? 3 : 0
+            initialItem: homePageComponent
+            clip: true
 
-            PersonalHomePage { }
-            PersonalStatisticsPage { }
-            PersonalPlaceholderPage {
-                pageTitle: "Кастомизация"
-                pageDescription: "Здесь появятся темы, фоновые рисунки и параметры визуального поведения. Структура personal-версии уже отделена от палитры, поэтому новые темы не потребуют переделки экранов."
-                symbol: "◌"
+            pushEnter: Transition {
+                ParallelAnimation {
+                    NumberAnimation {
+                        property: "opacity"
+                        from: 0
+                        to: 1
+                        duration: PersonalTheme.durSlow
+                        easing.type: PersonalTheme.easeOut
+                    }
+                    NumberAnimation {
+                        property: "y"
+                        from: 12
+                        to: 0
+                        duration: PersonalTheme.durSlow
+                        easing.type: PersonalTheme.easeOut
+                    }
+                }
             }
-            PersonalPlaceholderPage {
-                pageTitle: "Настройки"
-                pageDescription: "Здесь будут системные параметры, голосовое управление и раздел Extra. Наполнение определим отдельно, не смешивая настройки с ежедневными действиями."
-                symbol: "⚙"
+            pushExit: Transition {
+                ParallelAnimation {
+                    NumberAnimation {
+                        property: "opacity"
+                        from: 1
+                        to: 0
+                        duration: PersonalTheme.durSlow
+                        easing.type: PersonalTheme.easeOut
+                    }
+                    NumberAnimation {
+                        property: "y"
+                        from: 0
+                        to: -12
+                        duration: PersonalTheme.durSlow
+                        easing.type: PersonalTheme.easeOut
+                    }
+                }
             }
         }
     }
@@ -242,7 +314,7 @@ ApplicationWindow {
     Rectangle {
         id: toast
         z: 900
-        width: Math.min(420, window.width - 80)
+        width: Math.round(Math.min(420, window.width - 80))
         height: backend.lastMessage.detail ? 78 : 62
         radius: PersonalTheme.radiusMedium
         color: PersonalTheme.surfaceRaised
@@ -256,8 +328,7 @@ ApplicationWindow {
         anchors.bottomMargin: backend.lastMessage.title ? 24 : -height - 10
 
         Behavior on anchors.bottomMargin {
-            enabled: !backend.reducedMotion
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: PersonalTheme.durFocus; easing.type: PersonalTheme.easeOut }
         }
 
         Column {
@@ -267,23 +338,23 @@ ApplicationWindow {
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             spacing: 4
-            Text {
+            Shared.LabelSharp {
                 width: parent.width
                 text: backend.lastMessage.title || ""
                 color: PersonalTheme.text
                 elide: Text.ElideRight
                 font.family: PersonalTheme.bodyFont
-                font.pixelSize: 12
+                font.pixelSize: PersonalTheme.label
                 font.weight: Font.DemiBold
             }
-            Text {
+            Shared.LabelSharp {
                 width: parent.width
                 visible: text.length > 0
                 text: backend.lastMessage.detail || ""
                 color: PersonalTheme.muted
                 elide: Text.ElideRight
                 font.family: PersonalTheme.bodyFont
-                font.pixelSize: 10
+                font.pixelSize: PersonalTheme.micro
             }
         }
         Rectangle {
@@ -295,11 +366,11 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            Text {
+            Shared.LabelSmooth {
                 anchors.centerIn: parent
                 text: "×"
                 color: PersonalTheme.muted
-                font.pixelSize: 18
+                font.pixelSize: PersonalTheme.title
             }
             HoverHandler { id: closeToastHover }
             TapHandler { onTapped: backend.dismissMessage() }
@@ -308,8 +379,8 @@ ApplicationWindow {
 
     Popup {
         id: confirmPopup
-        width: Math.min(510, window.width - 80)
-        height: Math.min(420, Math.max(254, confirmContent.implicitHeight + 42))
+        width: Math.round(Math.min(510, window.width - 80))
+        height: Math.round(Math.min(420, Math.max(254, confirmContent.implicitHeight + 42)))
         anchors.centerIn: Overlay.overlay
         modal: true
         focus: true
@@ -328,27 +399,28 @@ ApplicationWindow {
             anchors.margins: 22
             spacing: 14
 
-            Text {
+            Shared.LabelSmooth {
                 Layout.fillWidth: true
                 text: backend.pendingAction.title || "Подтвердите действие"
                 color: PersonalTheme.text
                 wrapMode: Text.WordWrap
                 font.family: PersonalTheme.displayFont
-                font.pixelSize: 24
+                font.pixelSize: PersonalTheme.hero
             }
-            Text {
+            Shared.LabelSharp {
                 Layout.fillWidth: true
                 text: backend.pendingAction.detail || ""
                 color: PersonalTheme.muted
                 wrapMode: Text.WordWrap
                 font.family: PersonalTheme.bodyFont
-                font.pixelSize: 12
+                font.pixelSize: PersonalTheme.label
             }
 
             ListView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: backend.pendingAction.candidates && backend.pendingAction.candidates.length > 0
+                visible: Boolean(backend.pendingAction.candidates
+                                 && backend.pendingAction.candidates.length > 0)
                 model: backend.pendingAction.candidates || []
                 spacing: 6
                 clip: true
@@ -364,18 +436,18 @@ ApplicationWindow {
                         anchors.fill: parent
                         anchors.leftMargin: 12
                         anchors.rightMargin: 12
-                        Text {
+                        Shared.LabelSharp {
                             text: modelData.name
                             color: PersonalTheme.text
                             font.family: PersonalTheme.bodyFont
-                            font.pixelSize: 11
+                            font.pixelSize: PersonalTheme.caption
                         }
                         Item { Layout.fillWidth: true }
-                        Text {
+                        Shared.LabelSharp {
                             text: "PID " + modelData.pid
                             color: PersonalTheme.subtle
                             font.family: PersonalTheme.utilityFont
-                            font.pixelSize: 9
+                            font.pixelSize: PersonalTheme.micro
                         }
                     }
                 }
@@ -390,11 +462,11 @@ ApplicationWindow {
                     text: "Отмена"
                     enabled: !backend.busy
                     onClicked: backend.cancelPending()
-                    contentItem: Text {
+                    contentItem: Shared.LabelSharp {
                         text: parent.text
                         color: PersonalTheme.text
                         font.family: PersonalTheme.bodyFont
-                        font.pixelSize: 12
+                        font.pixelSize: PersonalTheme.label
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -411,11 +483,11 @@ ApplicationWindow {
                     text: backend.busy ? "Выполняю…" : "Подтвердить"
                     enabled: !backend.busy
                     onClicked: backend.confirmPending()
-                    contentItem: Text {
+                    contentItem: Shared.LabelSharp {
                         text: parent.text
                         color: PersonalTheme.backgroundDeep
                         font.family: PersonalTheme.bodyFont
-                        font.pixelSize: 12
+                        font.pixelSize: PersonalTheme.label
                         font.weight: Font.DemiBold
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter

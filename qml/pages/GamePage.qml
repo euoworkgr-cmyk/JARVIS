@@ -16,19 +16,19 @@ Item {
             Layout.preferredHeight: 44
             Column {
                 spacing: 3
-                Text {
+                LabelSmooth {
                     text: "ИГРОВОЙ РЕЖИМ"
                     color: Theme.text
                     font.family: Theme.headingFont
-                    font.pixelSize: 25
+                    font.pixelSize: Theme.hero
                     font.weight: Font.DemiBold
                     font.letterSpacing: 0.8
                 }
-                Text {
+                LabelSharp {
                     text: "Освободите ресурсы перед запуском игры"
                     color: Theme.muted
                     font.family: Theme.bodyFont
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.body
                 }
             }
             Item { Layout.fillWidth: true }
@@ -63,11 +63,11 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        Text {
+                        LabelSmooth {
                             text: "НАЙДЕННЫЕ ПРОЦЕССЫ"
                             color: Theme.text
                             font.family: Theme.headingFont
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.title
                             font.weight: Font.DemiBold
                         }
                         Item { Layout.fillWidth: true }
@@ -76,12 +76,12 @@ Item {
                             height: 26
                             radius: 13
                             color: backend.gameCandidates.length > 0 ? "#2CF3B85B" : "#18345F"
-                            Text {
+                            LabelSharp {
                                 anchors.centerIn: parent
                                 text: backend.gameCandidates.length
                                 color: backend.gameCandidates.length > 0 ? Theme.warning : Theme.muted
                                 font.family: Theme.monoFont
-                                font.pixelSize: 11
+                                font.pixelSize: Theme.caption
                                 font.weight: Font.Bold
                             }
                         }
@@ -110,20 +110,20 @@ Item {
                                     sourceSize.height: 26
                                 }
                             }
-                            Text {
+                            LabelSmooth {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "Сначала выполните проверку"
                                 color: Theme.text
                                 font.family: Theme.bodyFont
-                                font.pixelSize: 16
+                                font.pixelSize: Theme.title
                                 font.weight: Font.DemiBold
                             }
-                            Text {
+                            LabelSharp {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "Jarvis покажет браузеры и приложения с заметной GPU-нагрузкой."
                                 color: Theme.muted
                                 font.family: Theme.bodyFont
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.label
                             }
                         }
 
@@ -155,53 +155,53 @@ Item {
                                         height: 34
                                         radius: 11
                                         color: "#2CF3B85B"
-                                        Text {
+                                        LabelSmooth {
                                             anchors.centerIn: parent
                                             text: "!"
                                             color: Theme.warning
                                             font.family: Theme.headingFont
-                                            font.pixelSize: 17
+                                            font.pixelSize: Theme.title
                                             font.weight: Font.Bold
                                         }
                                     }
                                     Column {
                                         Layout.fillWidth: true
                                         spacing: 3
-                                        Text {
+                                        LabelSharp {
                                             width: parent.width
                                             text: modelData.name
                                             color: Theme.text
                                             elide: Text.ElideRight
                                             font.family: Theme.bodyFont
-                                            font.pixelSize: 13
+                                            font.pixelSize: Theme.body
                                             font.weight: Font.DemiBold
                                         }
-                                        Text {
+                                        LabelSharp {
                                             text: modelData.reason
                                             color: Theme.muted
                                             font.family: Theme.bodyFont
-                                            font.pixelSize: 11
+                                            font.pixelSize: Theme.caption
                                         }
                                     }
-                                    Text {
+                                    LabelSharp {
                                         text: "PID " + modelData.pid
                                         color: Theme.muted
                                         font.family: Theme.monoFont
-                                        font.pixelSize: 10
+                                        font.pixelSize: Theme.micro
                                     }
                                 }
                             }
                         }
                     }
 
-                    Text {
+                    LabelSharp {
                         Layout.fillWidth: true
                         visible: backend.gameWarning.length > 0
                         text: backend.gameWarning
                         color: Theme.warning
                         wrapMode: Text.WordWrap
                         font.family: Theme.bodyFont
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.caption
                     }
                 }
             }
@@ -222,20 +222,20 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 18
                         spacing: 10
-                        Text {
+                        LabelSharp {
                             text: "ЗАВЕРШИТЬ ПРИЛОЖЕНИЕ"
                             color: Theme.muted
                             font.family: Theme.monoFont
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.micro
                             font.letterSpacing: 1.1
                         }
-                        Text {
+                        LabelSharp {
                             Layout.fillWidth: true
                             text: "Jarvis найдёт процесс и покажет точное дерево перед завершением."
                             color: Theme.text
                             wrapMode: Text.WordWrap
                             font.family: Theme.bodyFont
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.label
                         }
                         TextField {
                             id: killField
@@ -247,13 +247,21 @@ Item {
                             placeholderText: "Например, chrome"
                             placeholderTextColor: "#7388B2"
                             font.family: Theme.bodyFont
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.body
+                            renderType: Text.NativeRendering
                             Accessible.name: "Название процесса для завершения"
                             background: Rectangle {
                                 radius: 11
                                 color: "#B4081734"
-                                border.width: killField.activeFocus ? 1.5 : 1
+                                border.width: killField.activeFocus ? 2 : 1
                                 border.color: killField.activeFocus ? Theme.accent : Theme.border
+
+                                Behavior on border.width {
+                                    NumberAnimation { duration: Theme.durFocus; easing.type: Theme.easeOut }
+                                }
+                                Behavior on border.color {
+                                    ColorAnimation { duration: Theme.durFocus }
+                                }
                             }
                             onAccepted: killButton.clicked()
                         }
@@ -275,21 +283,21 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 18
                         spacing: 11
-                        Text {
+                        LabelSharp {
                             text: "ЗАЩИТА"
                             color: Theme.muted
                             font.family: Theme.monoFont
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.micro
                             font.letterSpacing: 1.1
                         }
-                        Text {
+                        LabelSharp {
                             Layout.fillWidth: true
                             text: "Системные процессы Windows, NVIDIA, JARVIS, Steam, Epic Games Launcher и игровые процессы не закрываются."
                             color: Theme.text
                             wrapMode: Text.WordWrap
                             font.family: Theme.bodyFont
-                            font.pixelSize: 12
-                            lineHeight: 1.25
+                            font.pixelSize: Theme.label
+                            lineHeight: Theme.lineHeightRelaxed
                         }
                         Item { Layout.fillHeight: true }
                         Rectangle {
@@ -303,11 +311,11 @@ Item {
                                 anchors.centerIn: parent
                                 spacing: 9
                                 Rectangle { width: 8; height: 8; radius: 4; color: Theme.success; anchors.verticalCenter: parent.verticalCenter }
-                                Text {
+                                LabelSharp {
                                     text: "Защита активна"
                                     color: Theme.success
                                     font.family: Theme.bodyFont
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.label
                                     font.weight: Font.DemiBold
                                 }
                             }

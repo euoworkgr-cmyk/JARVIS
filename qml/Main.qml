@@ -18,6 +18,30 @@ ApplicationWindow {
     title: "JARVIS Desktop"
     property bool windowMoving: false
 
+    function pageComponent(page) {
+        if (page === "apps")
+            return appsPageComponent
+        if (page === "game")
+            return gamePageComponent
+        if (page === "notes")
+            return notesPageComponent
+        return homePageComponent
+    }
+
+    function showPage(page) {
+        const component = pageComponent(page)
+        if (pageStack.currentItem && pageStack.currentItem.pageKey === page)
+            return
+        pageStack.replace(
+            pageStack.currentItem,
+            component,
+            {},
+            StackView.PushTransition
+        )
+    }
+
+    Component.onCompleted: Theme.reducedMotion = backend.reducedMotion
+
     onClosing: function(close) {
         if (!backend.quitting) {
             close.accepted = false
@@ -28,6 +52,7 @@ ApplicationWindow {
     Connections {
         target: backend
         function onHelpRequested() { helpPopup.open() }
+        function onCurrentPageChanged() { window.showPage(backend.currentPage) }
         function onPendingActionChanged() {
             if (backend.pendingAction.pending_id)
                 confirmPopup.open()
@@ -47,19 +72,19 @@ ApplicationWindow {
         }
 
         Rectangle {
-            width: parent.width * 0.55
+            width: Math.round(parent.width * 0.55)
             height: width
             radius: width / 2
-            x: parent.width * 0.62
-            y: -height * 0.64
+            x: Math.round(parent.width * 0.62)
+            y: Math.round(-height * 0.64)
             color: "#17166CFF"
         }
         Rectangle {
-            width: parent.width * 0.42
+            width: Math.round(parent.width * 0.42)
             height: width
             radius: width / 2
-            x: -width * 0.66
-            y: parent.height * 0.62
+            x: Math.round(-width * 0.66)
+            y: Math.round(parent.height * 0.62)
             color: "#112F9DFF"
         }
     }
@@ -99,12 +124,12 @@ ApplicationWindow {
                         GradientStop { position: 0; color: Theme.accent }
                         GradientStop { position: 1; color: Theme.primary }
                     }
-                    Text {
+                    LabelSmooth {
                         anchors.centerIn: parent
                         text: "J"
                         color: Theme.text
                         font.family: Theme.headingFont
-                        font.pixelSize: 20
+                        font.pixelSize: Theme.title
                         font.weight: Font.Bold
                     }
                 }
@@ -112,19 +137,19 @@ ApplicationWindow {
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
-                    Text {
+                    LabelSmooth {
                         text: "JARVIS"
                         color: Theme.text
                         font.family: Theme.headingFont
-                        font.pixelSize: 20
+                        font.pixelSize: Theme.title
                         font.weight: Font.Bold
                         font.letterSpacing: 1.1
                     }
-                    Text {
+                    LabelSharp {
                         text: "DESKTOP COMMAND CENTER"
                         color: Theme.muted
                         font.family: Theme.monoFont
-                        font.pixelSize: 8
+                        font.pixelSize: Theme.micro
                         font.letterSpacing: 1.2
                     }
                 }
@@ -151,12 +176,27 @@ ApplicationWindow {
                         color: backend.jarvisState === "error" ? Theme.danger
                               : backend.jarvisState === "pending" ? Theme.warning
                               : backend.busy ? Theme.accent : Theme.success
+
+                        SequentialAnimation on opacity {
+                            running: !Theme.reducedMotion && backend.jarvisState === "idle"
+                            loops: Animation.Infinite
+                            NumberAnimation {
+                                to: 0.5
+                                duration: Math.round(Theme.durPulse / 2)
+                                easing.type: Easing.InOutSine
+                            }
+                            NumberAnimation {
+                                to: 1
+                                duration: Math.round(Theme.durPulse / 2)
+                                easing.type: Easing.InOutSine
+                            }
+                        }
                     }
-                    Text {
+                    LabelSharp {
                         text: backend.stateLabel
                         color: Theme.text
                         font.family: Theme.bodyFont
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.caption
                     }
                 }
             }
@@ -183,12 +223,12 @@ ApplicationWindow {
                                : "transparent"
                         Accessible.role: Accessible.Button
                         Accessible.name: modelData.label
-                        Text {
+                        LabelSmooth {
                             anchors.centerIn: parent
                             text: modelData.symbol
                             color: Theme.text
                             font.family: Theme.bodyFont
-                            font.pixelSize: modelData.action === "close" ? 20 : 16
+                            font.pixelSize: Theme.title
                         }
                         HoverHandler { id: buttonHover }
                         TapHandler {
@@ -276,21 +316,71 @@ ApplicationWindow {
                 }
             }
 
-            StackLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                currentIndex: backend.currentPage === "apps" ? 1
-                            : backend.currentPage === "game" ? 2
-                            : backend.currentPage === "notes" ? 3 : 0
-
+            Component {
+                id: homePageComponent
                 HomePage {
+                    property string pageKey: "home"
                     animationEnabled: window.visible
                                       && window.visibility !== Window.Minimized
                                       && !window.windowMoving
                 }
-                AppsPage { }
-                GamePage { }
-                NotesPage { }
+            }
+            Component {
+                id: appsPageComponent
+                AppsPage { property string pageKey: "apps" }
+            }
+            Component {
+                id: gamePageComponent
+                GamePage { property string pageKey: "game" }
+            }
+            Component {
+                id: notesPageComponent
+                NotesPage { property string pageKey: "notes" }
+            }
+
+            StackView {
+                id: pageStack
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                initialItem: homePageComponent
+                clip: true
+
+                pushEnter: Transition {
+                    ParallelAnimation {
+                        NumberAnimation {
+                            property: "opacity"
+                            from: 0
+                            to: 1
+                            duration: Theme.durSlow
+                            easing.type: Theme.easeOut
+                        }
+                        NumberAnimation {
+                            property: "y"
+                            from: 12
+                            to: 0
+                            duration: Theme.durSlow
+                            easing.type: Theme.easeOut
+                        }
+                    }
+                }
+                pushExit: Transition {
+                    ParallelAnimation {
+                        NumberAnimation {
+                            property: "opacity"
+                            from: 1
+                            to: 0
+                            duration: Theme.durSlow
+                            easing.type: Theme.easeOut
+                        }
+                        NumberAnimation {
+                            property: "y"
+                            from: 0
+                            to: -12
+                            duration: Theme.durSlow
+                            easing.type: Theme.easeOut
+                        }
+                    }
+                }
             }
         }
     }
@@ -298,7 +388,7 @@ ApplicationWindow {
     Rectangle {
         id: toast
         z: 900
-        width: Math.min(430, window.width - 80)
+        width: Math.round(Math.min(430, window.width - 80))
         height: backend.lastMessage.detail ? 82 : 66
         radius: 16
         color: Theme.panelStrong
@@ -313,8 +403,7 @@ ApplicationWindow {
         visible: anchors.bottomMargin > -height
 
         Behavior on anchors.bottomMargin {
-            enabled: !backend.reducedMotion
-            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.durBase; easing.type: Theme.easeOut }
         }
 
         readonly property color statusColor: backend.lastMessage.status === "error" || backend.lastMessage.status === "not_found"
@@ -323,7 +412,7 @@ ApplicationWindow {
 
         Rectangle {
             width: 4
-            height: parent.height - 22
+            height: Math.round(parent.height - 22)
             radius: 2
             color: toast.statusColor
             anchors.left: parent.left
@@ -337,23 +426,23 @@ ApplicationWindow {
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             spacing: 4
-            Text {
+            LabelSharp {
                 width: parent.width
                 text: backend.lastMessage.title || ""
                 color: Theme.text
                 elide: Text.ElideRight
                 font.family: Theme.bodyFont
-                font.pixelSize: 13
+                font.pixelSize: Theme.body
                 font.weight: Font.DemiBold
             }
-            Text {
+            LabelSharp {
                 width: parent.width
                 visible: text.length > 0
                 text: backend.lastMessage.detail || ""
                 color: Theme.muted
                 elide: Text.ElideRight
                 font.family: Theme.bodyFont
-                font.pixelSize: 11
+                font.pixelSize: Theme.caption
             }
         }
         Rectangle {
@@ -365,7 +454,7 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
-            Text { anchors.centerIn: parent; text: "×"; color: Theme.muted; font.pixelSize: 18 }
+            LabelSmooth { anchors.centerIn: parent; text: "×"; color: Theme.muted; font.pixelSize: Theme.title }
             HoverHandler { id: closeToastHover }
             TapHandler { onTapped: backend.dismissMessage() }
         }
@@ -373,8 +462,8 @@ ApplicationWindow {
 
     Popup {
         id: confirmPopup
-        width: Math.min(520, window.width - 80)
-        height: Math.min(430, Math.max(260, confirmContent.implicitHeight + 44))
+        width: Math.round(Math.min(520, window.width - 80))
+        height: Math.round(Math.min(430, Math.max(260, confirmContent.implicitHeight + 44)))
         anchors.centerIn: Overlay.overlay
         modal: true
         focus: true
@@ -398,38 +487,39 @@ ApplicationWindow {
                 height: 46
                 radius: 15
                 color: "#2CF3B85B"
-                Text {
+                LabelSmooth {
                     anchors.centerIn: parent
                     text: "!"
                     color: Theme.warning
                     font.family: Theme.headingFont
-                    font.pixelSize: 24
+                    font.pixelSize: Theme.hero
                     font.weight: Font.Bold
                 }
             }
 
-            Text {
+            LabelSmooth {
                 Layout.fillWidth: true
                 text: backend.pendingAction.title || "Подтвердите действие"
                 color: Theme.text
                 wrapMode: Text.WordWrap
                 font.family: Theme.headingFont
-                font.pixelSize: 22
+                font.pixelSize: Theme.hero
                 font.weight: Font.DemiBold
             }
-            Text {
+            LabelSmooth {
                 Layout.fillWidth: true
                 text: backend.pendingAction.detail || ""
                 color: Theme.muted
                 wrapMode: Text.WordWrap
                 font.family: Theme.bodyFont
-                font.pixelSize: 14
+                font.pixelSize: Theme.title
             }
 
             ListView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: backend.pendingAction.candidates && backend.pendingAction.candidates.length > 0
+                visible: Boolean(backend.pendingAction.candidates
+                                 && backend.pendingAction.candidates.length > 0)
                 model: backend.pendingAction.candidates || []
                 spacing: 7
                 clip: true
@@ -445,18 +535,18 @@ ApplicationWindow {
                         anchors.fill: parent
                         anchors.leftMargin: 14
                         anchors.rightMargin: 14
-                        Text {
+                        LabelSharp {
                             text: modelData.name
                             color: Theme.text
                             font.family: Theme.bodyFont
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.body
                         }
                         Item { Layout.fillWidth: true }
-                        Text {
+                        LabelSharp {
                             text: "PID " + modelData.pid + "  ·  " + modelData.reason
                             color: Theme.muted
                             font.family: Theme.monoFont
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.micro
                         }
                     }
                 }
@@ -472,11 +562,11 @@ ApplicationWindow {
                     text: "Отмена"
                     enabled: !backend.busy
                     onClicked: backend.cancelPending()
-                    contentItem: Text {
+                    contentItem: LabelSmooth {
                         text: parent.text
                         color: Theme.text
                         font.family: Theme.bodyFont
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.body
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -493,11 +583,11 @@ ApplicationWindow {
                     text: backend.busy ? "Выполняю…" : "Подтвердить"
                     enabled: !backend.busy
                     onClicked: backend.confirmPending()
-                    contentItem: Text {
+                    contentItem: LabelSharp {
                         text: parent.text
                         color: Theme.text
                         font.family: Theme.bodyFont
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.body
                         font.weight: Font.DemiBold
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -515,8 +605,8 @@ ApplicationWindow {
 
     Popup {
         id: helpPopup
-        width: Math.min(680, window.width - 80)
-        height: Math.min(570, window.height - 70)
+        width: Math.round(Math.min(680, window.width - 80))
+        height: Math.round(Math.min(570, window.height - 70))
         anchors.centerIn: Overlay.overlay
         modal: true
         focus: true
@@ -535,28 +625,28 @@ ApplicationWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Column {
-                    Text {
+                    LabelSmooth {
                         text: "Команды JARVIS"
                         color: Theme.text
                         font.family: Theme.headingFont
-                        font.pixelSize: 24
+                        font.pixelSize: Theme.hero
                         font.weight: Font.DemiBold
                     }
-                    Text {
+                    LabelSharp {
                         text: "Все действия доступны из строки на Главной"
                         color: Theme.muted
                         font.family: Theme.bodyFont
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.body
                     }
                 }
                 Item { Layout.fillWidth: true }
                 Button {
                     text: "×"
                     onClicked: helpPopup.close()
-                    contentItem: Text {
+                    contentItem: LabelSmooth {
                         text: parent.text
                         color: Theme.text
-                        font.pixelSize: 22
+                        font.pixelSize: Theme.hero
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -600,19 +690,19 @@ ApplicationWindow {
                         anchors.fill: parent
                         anchors.leftMargin: 16
                         anchors.rightMargin: 16
-                        Text {
+                        LabelSharp {
                             Layout.preferredWidth: 220
                             text: modelData[0]
                             color: Theme.accent
                             font.family: Theme.monoFont
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.caption
                         }
-                        Text {
+                        LabelSharp {
                             Layout.fillWidth: true
                             text: modelData[1]
                             color: Theme.text
                             font.family: Theme.bodyFont
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.label
                         }
                     }
                 }

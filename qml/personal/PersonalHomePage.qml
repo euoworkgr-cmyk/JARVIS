@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "."
+import ".." as Shared
 
 Item {
     id: root
@@ -40,7 +41,7 @@ Item {
 
         Item {
             id: content
-            width: Math.max(0, pageFlickable.width - 14)
+            width: Math.round(Math.max(0, pageFlickable.width - 14))
             implicitHeight: pageColumn.implicitHeight
 
             ColumnLayout {
@@ -50,10 +51,10 @@ Item {
 
                 Item {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 218
+                    Layout.preferredHeight: 184
 
                     MountainBackdrop {
-                        width: parent.width * 0.74
+                        width: Math.round(parent.width * 0.74)
                         height: parent.height
                         anchors.right: parent.right
                         anchors.top: parent.top
@@ -63,45 +64,53 @@ Item {
                         anchors.left: parent.left
                         anchors.top: parent.top
                         anchors.topMargin: 12
-                        width: Math.min(620, parent.width * 0.72)
+                        width: Math.round(Math.min(620, parent.width * 0.72))
                         spacing: 14
 
-                        Text {
+                        Shared.LabelSmooth {
                             width: parent.width
                             text: "Привет, " + backend.displayName + "!\nКак я могу помочь?"
                             color: PersonalTheme.text
                             font.family: PersonalTheme.displayFont
-                            font.pixelSize: 38
+                            font.pixelSize: PersonalTheme.hero
                             font.weight: Font.Normal
-                            lineHeight: 1.12
+                            lineHeight: PersonalTheme.lineHeightTight
                             wrapMode: Text.WordWrap
                         }
 
                         Row {
-                            spacing: 12
+                            spacing: 10
 
-                            Row {
+                            Rectangle {
+                                width: 8
+                                height: 8
+                                radius: 4
+                                opacity: 1
+                                color: backend.busy ? PersonalTheme.warning
+                                                      : backend.jarvisState === "error" ? PersonalTheme.danger
+                                                      : PersonalTheme.accent
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 3
-                                Repeater {
-                                    model: [8, 15, 22, 12, 18, 9]
-                                    Rectangle {
-                                        required property int modelData
-                                        width: 3
-                                        height: modelData
-                                        radius: 2
-                                        color: backend.busy ? PersonalTheme.warning
-                                                              : backend.jarvisState === "error" ? PersonalTheme.danger
-                                                              : PersonalTheme.accent
-                                        anchors.verticalCenter: parent.verticalCenter
+
+                                SequentialAnimation on opacity {
+                                    running: !Shared.Theme.reducedMotion && backend.jarvisState === "idle"
+                                    loops: Animation.Infinite
+                                    NumberAnimation {
+                                        to: 0.5
+                                        duration: Math.round(PersonalTheme.durPulse / 2)
+                                        easing.type: Easing.InOutSine
+                                    }
+                                    NumberAnimation {
+                                        to: 1
+                                        duration: Math.round(PersonalTheme.durPulse / 2)
+                                        easing.type: Easing.InOutSine
                                     }
                                 }
                             }
-                            Text {
-                                text: backend.jarvisState === "idle" ? "Готов к команде" : backend.stateLabel
+                            Shared.LabelSharp {
+                                text: backend.jarvisState === "idle" ? "Готов к работе" : backend.stateLabel
                                 color: backend.jarvisState === "error" ? PersonalTheme.danger : PersonalTheme.accent
                                 font.family: PersonalTheme.bodyFont
-                                font.pixelSize: 12
+                                font.pixelSize: PersonalTheme.label
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                         }
@@ -115,9 +124,19 @@ Item {
                                 Layout.preferredHeight: 44
                                 radius: PersonalTheme.radiusSmall
                                 color: PersonalTheme.surface
-                                border.width: commandField.activeFocus ? 1.5 : 1
+                                border.width: commandField.activeFocus ? 2 : 1
                                 border.color: commandField.activeFocus ? PersonalTheme.accent
                                                                       : PersonalTheme.border
+
+                                Behavior on border.width {
+                                    NumberAnimation {
+                                        duration: PersonalTheme.durFocus
+                                        easing.type: PersonalTheme.easeOut
+                                    }
+                                }
+                                Behavior on border.color {
+                                    ColorAnimation { duration: PersonalTheme.durFocus }
+                                }
 
                                 TextField {
                                     id: commandField
@@ -131,20 +150,21 @@ Item {
                                     placeholderText: "Введите команду"
                                     placeholderTextColor: PersonalTheme.subtle
                                     font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: 12
+                                    font.pixelSize: PersonalTheme.label
+                                    renderType: Text.NativeRendering
                                     Accessible.name: "Команда JARVIS"
                                     background: Item { }
                                     onAccepted: root.submitCommand()
                                 }
 
-                                Text {
+                                Shared.LabelSharp {
                                     anchors.right: parent.right
                                     anchors.rightMargin: 12
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: "Ctrl+K"
                                     color: PersonalTheme.subtle
                                     font.family: PersonalTheme.utilityFont
-                                    font.pixelSize: 8
+                                    font.pixelSize: PersonalTheme.micro
                                 }
                             }
 
@@ -166,17 +186,17 @@ Item {
                                     border.color: PersonalTheme.text
 
                                     Behavior on color {
-                                        ColorAnimation { duration: PersonalTheme.motionFast }
+                                        ColorAnimation { duration: PersonalTheme.durFast }
                                     }
                                 }
 
-                                contentItem: Text {
+                                contentItem: Shared.LabelSharp {
                                     text: backend.busy ? "Выполняю" : "Запустить"
                                     color: "#17190F"
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                     font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: 11
+                                    font.pixelSize: PersonalTheme.caption
                                     font.weight: Font.DemiBold
                                 }
 
@@ -211,11 +231,11 @@ Item {
                     Layout.fillWidth: true
                     spacing: 10
 
-                    Text {
+                    Shared.LabelSmooth {
                         text: "Быстрый запуск"
                         color: PersonalTheme.text
                         font.family: PersonalTheme.bodyFont
-                        font.pixelSize: 17
+                        font.pixelSize: PersonalTheme.title
                         font.weight: Font.Medium
                     }
 
@@ -240,14 +260,12 @@ Item {
                                 Accessible.role: Accessible.Button
                                 Accessible.name: "Запустить " + modelData.title
 
-                                transform: Translate {
-                                    y: presetHover.hovered ? -1 : 0
-                                    Behavior on y {
-                                        enabled: !backend.reducedMotion
-                                        NumberAnimation {
-                                            duration: PersonalTheme.motionFast
-                                            easing.type: Easing.OutCubic
-                                        }
+                                scale: presetTap.pressed ? 0.97
+                                                       : presetHover.hovered ? 1.015 : 1
+                                Behavior on scale {
+                                    NumberAnimation {
+                                        duration: PersonalTheme.durFast
+                                        easing.type: PersonalTheme.easeOut
                                     }
                                 }
 
@@ -256,13 +274,13 @@ Item {
                                     color: presetTap.pressed ? PersonalTheme.backgroundDeep
                                                              : presetHover.hovered ? PersonalTheme.surfaceHover
                                                                                    : PersonalTheme.surface
-                                    border.width: presetCard.activeFocus ? 1.5 : 1
+                                    border.width: presetCard.activeFocus ? 2 : 1
                                     border.color: presetCard.activeFocus ? PersonalTheme.accent
                                                                          : presetHover.hovered ? PersonalTheme.borderStrong
                                                                                                : PersonalTheme.border
 
                                     Behavior on color {
-                                        ColorAnimation { duration: PersonalTheme.motionFast }
+                                        ColorAnimation { duration: PersonalTheme.durFast }
                                     }
                                 }
 
@@ -295,18 +313,18 @@ Item {
                                             border.width: 1
                                             border.color: PersonalTheme.accentMuted
 
-                                            Text {
+                                            Shared.LabelSmooth {
                                                 anchors.centerIn: parent
                                                 text: presetCard.modelData.monogram
                                                 color: PersonalTheme.accent
                                                 font.family: PersonalTheme.utilityFont
-                                                font.pixelSize: 10
+                                                font.pixelSize: PersonalTheme.micro
                                                 font.weight: Font.DemiBold
                                             }
                                         }
                                     }
 
-                                    Text {
+                                    Shared.LabelSmooth {
                                         Layout.fillWidth: true
                                         Layout.leftMargin: 8
                                         Layout.rightMargin: 8
@@ -316,7 +334,7 @@ Item {
                                         maximumLineCount: 2
                                         horizontalAlignment: Text.AlignHCenter
                                         font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 11
+                                        font.pixelSize: PersonalTheme.caption
                                     }
                                 }
 
@@ -347,11 +365,11 @@ Item {
                     Layout.fillWidth: true
                     spacing: 10
 
-                    Text {
+                    Shared.LabelSmooth {
                         text: "Протоколы"
                         color: PersonalTheme.text
                         font.family: PersonalTheme.bodyFont
-                        font.pixelSize: 17
+                        font.pixelSize: PersonalTheme.title
                         font.weight: Font.Medium
                     }
 
@@ -369,14 +387,12 @@ Item {
                             Accessible.role: Accessible.Button
                             Accessible.name: "Запустить протокол " + modelData.title
 
-                            transform: Translate {
-                                y: protocolHover.hovered ? -1 : 0
-                                Behavior on y {
-                                    enabled: !backend.reducedMotion
-                                    NumberAnimation {
-                                        duration: PersonalTheme.motionFast
-                                        easing.type: Easing.OutCubic
-                                    }
+                            scale: protocolTap.pressed ? 0.97
+                                                       : protocolHover.hovered ? 1.015 : 1
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: PersonalTheme.durFast
+                                    easing.type: PersonalTheme.easeOut
                                 }
                             }
 
@@ -385,45 +401,45 @@ Item {
                                 color: protocolTap.pressed ? PersonalTheme.backgroundDeep
                                                            : protocolHover.hovered ? PersonalTheme.surfaceHover
                                                                                    : PersonalTheme.surface
-                                border.width: protocolRow.activeFocus ? 1.5 : 1
+                                border.width: protocolRow.activeFocus ? 2 : 1
                                 border.color: protocolRow.activeFocus ? PersonalTheme.accent
                                                                       : protocolHover.hovered ? PersonalTheme.borderStrong
                                                                                               : PersonalTheme.border
 
                                 Behavior on color {
-                                    ColorAnimation { duration: PersonalTheme.motionFast }
+                                    ColorAnimation { duration: PersonalTheme.durFast }
                                 }
                             }
 
                             contentItem: RowLayout {
                                 spacing: 13
 
-                                Text {
+                                Shared.LabelSmooth {
                                     Layout.leftMargin: 16
                                     Layout.preferredWidth: 28
                                     text: protocolRow.modelData.symbol
                                     color: PersonalTheme.accent
                                     horizontalAlignment: Text.AlignHCenter
                                     font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: 20
+                                    font.pixelSize: PersonalTheme.title
                                 }
 
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 2
-                                    Text {
+                                    Shared.LabelSmooth {
                                         text: protocolRow.modelData.title
                                         color: PersonalTheme.text
                                         font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 13
+                                        font.pixelSize: PersonalTheme.body
                                         font.weight: Font.Medium
                                     }
-                                    Text {
+                                    Shared.LabelSmooth {
                                         Layout.fillWidth: true
                                         text: protocolRow.modelData.detail
                                         color: PersonalTheme.muted
                                         font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 10
+                                        font.pixelSize: PersonalTheme.micro
                                     }
                                 }
 
@@ -435,21 +451,21 @@ Item {
                                     color: "transparent"
                                     border.width: 1
                                     border.color: PersonalTheme.warning
-                                    Text {
+                                    Shared.LabelSmooth {
                                         anchors.centerIn: parent
                                         text: "Extra"
                                         color: PersonalTheme.warning
                                         font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 8
+                                        font.pixelSize: PersonalTheme.micro
                                     }
                                 }
 
-                                Text {
+                                Shared.LabelSmooth {
                                     Layout.rightMargin: 16
                                     text: "›"
                                     color: protocolHover.hovered ? PersonalTheme.text : PersonalTheme.muted
                                     font.family: PersonalTheme.bodyFont
-                                    font.pixelSize: 24
+                                    font.pixelSize: PersonalTheme.hero
                                 }
                             }
 
@@ -481,20 +497,20 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        Text {
+                        Shared.LabelSmooth {
                             text: "Последние команды"
                             color: PersonalTheme.text
                             font.family: PersonalTheme.bodyFont
-                            font.pixelSize: 17
+                            font.pixelSize: PersonalTheme.title
                             font.weight: Font.Medium
                         }
                         Item { Layout.fillWidth: true }
-                        Text {
+                        Shared.LabelSharp {
                             Layout.rightMargin: 8
                             text: backend.historyItems.length + " из 100"
                             color: PersonalTheme.subtle
                             font.family: PersonalTheme.bodyFont
-                            font.pixelSize: 10
+                            font.pixelSize: PersonalTheme.micro
                         }
                     }
 
@@ -510,20 +526,20 @@ Item {
                             visible: backend.historyItems.length === 0
                             anchors.centerIn: parent
                             spacing: 5
-                            Text {
+                            Shared.LabelSharp {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "История пока пуста"
                                 color: PersonalTheme.text
                                 font.family: PersonalTheme.bodyFont
-                                font.pixelSize: 12
+                                font.pixelSize: PersonalTheme.label
                                 font.weight: Font.DemiBold
                             }
-                            Text {
+                            Shared.LabelSharp {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "Выполненные команды появятся здесь."
                                 color: PersonalTheme.muted
                                 font.family: PersonalTheme.bodyFont
-                                font.pixelSize: 10
+                                font.pixelSize: PersonalTheme.micro
                             }
                         }
 
@@ -542,12 +558,59 @@ Item {
                             delegate: Rectangle {
                                 id: historyRow
                                 required property var modelData
-                                width: historyList.width - 14
+                                required property int index
+                                width: Math.round(historyList.width - 14)
                                 height: 28
                                 radius: 6
-                                color: PersonalTheme.surfaceRaised
+                                color: historyTap.pressed ? PersonalTheme.backgroundDeep
+                                                          : historyHover.hovered ? PersonalTheme.surfaceHover
+                                                                                 : PersonalTheme.surfaceRaised
                                 border.width: 1
                                 border.color: PersonalTheme.border
+                                opacity: Shared.Theme.reducedMotion ? 1 : 0
+                                scale: historyTap.pressed ? 0.97
+                                                          : historyHover.hovered ? 1.015 : 1
+
+                                transform: Translate {
+                                    id: historyReveal
+                                    x: Shared.Theme.reducedMotion ? 0 : -8
+                                }
+
+                                Behavior on scale {
+                                    NumberAnimation {
+                                        duration: PersonalTheme.durFast
+                                        easing.type: PersonalTheme.easeOut
+                                    }
+                                }
+                                Behavior on color {
+                                    ColorAnimation { duration: PersonalTheme.durFast }
+                                }
+
+                                SequentialAnimation {
+                                    running: true
+                                    PauseAnimation {
+                                        duration: index * PersonalTheme.staggerStep
+                                    }
+                                    ParallelAnimation {
+                                        NumberAnimation {
+                                            target: historyRow
+                                            property: "opacity"
+                                            to: 1
+                                            duration: PersonalTheme.durBase
+                                            easing.type: PersonalTheme.easeOut
+                                        }
+                                        NumberAnimation {
+                                            target: historyReveal
+                                            property: "x"
+                                            to: 0
+                                            duration: PersonalTheme.durBase
+                                            easing.type: PersonalTheme.easeOut
+                                        }
+                                    }
+                                }
+
+                                HoverHandler { id: historyHover }
+                                TapHandler { id: historyTap }
 
                                 readonly property color statusColor: modelData.status === "success" ? PersonalTheme.success
                                                                            : modelData.status === "error" || modelData.status === "not_found" ? PersonalTheme.danger
@@ -570,37 +633,35 @@ Item {
                                     anchors.rightMargin: 10
                                     spacing: 10
 
-                                    Text {
+                                    Shared.LabelSmooth {
                                         Layout.preferredWidth: 210
                                         text: historyRow.modelData.command
                                         color: PersonalTheme.text
-                                        fontSizeMode: Text.HorizontalFit
-                                        minimumPixelSize: 7
+                                        elide: Text.ElideRight
                                         font.family: PersonalTheme.utilityFont
-                                        font.pixelSize: 10
+                                        font.pixelSize: PersonalTheme.micro
                                     }
-                                    Text {
+                                    Shared.LabelSmooth {
                                         Layout.fillWidth: true
                                         text: historyRow.modelData.title
                                         color: PersonalTheme.muted
-                                        fontSizeMode: Text.HorizontalFit
-                                        minimumPixelSize: 8
+                                        elide: Text.ElideRight
                                         font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 10
+                                        font.pixelSize: PersonalTheme.micro
                                     }
-                                    Text {
+                                    Shared.LabelSmooth {
                                         text: root.historyStatusLabel(historyRow.modelData.status)
                                         color: historyRow.statusColor
                                         font.family: PersonalTheme.bodyFont
-                                        font.pixelSize: 9
+                                        font.pixelSize: PersonalTheme.micro
                                     }
-                                    Text {
+                                    Shared.LabelSmooth {
                                         Layout.preferredWidth: 34
                                         text: root.historyTime(historyRow.modelData.timestamp)
                                         color: PersonalTheme.subtle
                                         horizontalAlignment: Text.AlignRight
                                         font.family: PersonalTheme.utilityFont
-                                        font.pixelSize: 9
+                                        font.pixelSize: PersonalTheme.micro
                                     }
                                 }
                             }

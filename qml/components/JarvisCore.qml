@@ -6,7 +6,7 @@ Item {
     id: root
     property string state: "idle"
     property string stateLabel: "Готов к работе"
-    property bool reducedMotion: false
+    property bool reducedMotion: Theme.reducedMotion
     property bool animationEnabled: true
 
     readonly property color semanticColor: state === "error" ? Theme.danger
@@ -24,10 +24,10 @@ Item {
 
     Item {
         id: ringField
-        width: Math.max(root.width, root.height) * 1.12
+        width: Math.round(Math.max(root.width, root.height) * 1.12)
         height: width
-        x: root.width * 0.32
-        y: (root.height - height) / 2
+        x: Math.round(root.width * 0.32)
+        y: Math.round((root.height - height) / 2)
 
         Repeater {
             model: ["#092866", "#0B3FA8", "#0C55D8", "#1269F4", "#1E7FFF", "#3499FF"]
@@ -35,7 +35,7 @@ Item {
                 required property int index
                 required property color modelData
                 anchors.centerIn: parent
-                width: parent.width - index * parent.width * 0.125
+                width: Math.round(parent.width - index * parent.width * 0.125)
                 height: width
                 radius: width / 2
                 color: modelData
@@ -47,7 +47,7 @@ Item {
 
         Rectangle {
             anchors.centerIn: parent
-            width: parent.width * 0.25
+            width: Math.round(parent.width * 0.25)
             height: width
             radius: width / 2
             color: "#71B9FF"
@@ -94,7 +94,7 @@ Item {
                 target: outerArc
                 from: 0
                 to: 360
-                duration: 2600
+                duration: Theme.durAmbientOuter
                 loops: Animation.Infinite
                 running: root.animationEnabled && !root.reducedMotion && root.state === "working"
             }
@@ -141,7 +141,7 @@ Item {
                 target: innerArc
                 from: 0
                 to: -360
-                duration: 3400
+                duration: Theme.durAmbientInner
                 loops: Animation.Infinite
                 running: root.animationEnabled && !root.reducedMotion && root.state === "working"
             }
@@ -150,8 +150,7 @@ Item {
 
         scale: root.state === "working" ? 1.025 : 1.0
         Behavior on scale {
-            enabled: !root.reducedMotion
-            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.durBase; easing.type: Theme.easeOut }
         }
     }
 
@@ -181,25 +180,25 @@ Item {
                 SequentialAnimation on opacity {
                     running: root.state === "working" && !root.reducedMotion
                     loops: Animation.Infinite
-                    NumberAnimation { to: 0.35; duration: 520 }
-                    NumberAnimation { to: 1.0; duration: 520 }
+                    NumberAnimation { to: 0.5; duration: Math.round(Theme.durPulse / 2); easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1.0; duration: Math.round(Theme.durPulse / 2); easing.type: Easing.InOutSine }
                 }
             }
 
             Column {
                 spacing: 2
-                Text {
+                LabelSharp {
                     text: "JARVIS CORE"
                     color: Theme.muted
                     font.family: Theme.monoFont
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.micro
                     font.letterSpacing: 1.4
                 }
-                Text {
+                LabelSmooth {
                     text: root.stateLabel
                     color: Theme.text
                     font.family: Theme.bodyFont
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.title
                     font.weight: Font.DemiBold
                 }
             }

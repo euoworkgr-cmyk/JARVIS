@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import "."
 
 Window {
     id: petWindow
@@ -56,7 +57,7 @@ Window {
     Timer {
         interval: 3000 + Math.random() * 4000
         repeat: true
-        running: !backend.reducedMotion
+        running: !Theme.reducedMotion
         onTriggered: {
             if (!petDrag.active && petWindow.sprite === "idle") {
                 petWindow.sprite = "blink"
@@ -70,7 +71,7 @@ Window {
     Timer {
         interval: 20000 + Math.random() * 20000
         repeat: true
-        running: !backend.reducedMotion
+        running: !Theme.reducedMotion
         onTriggered: {
             if (!petDrag.active && petWindow.sprite === "idle") {
                 const choices = ["laptop", "jump"]

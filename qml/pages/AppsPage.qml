@@ -15,19 +15,19 @@ Item {
             Layout.fillWidth: true
             Column {
                 spacing: 3
-                Text {
+                LabelSmooth {
                     text: "ПРИЛОЖЕНИЯ"
                     color: Theme.text
                     font.family: Theme.headingFont
-                    font.pixelSize: 25
+                    font.pixelSize: Theme.hero
                     font.weight: Font.DemiBold
                     font.letterSpacing: 0.8
                 }
-                Text {
+                LabelSharp {
                     text: backend.programItems.length + " программ в локальном индексе Windows"
                     color: Theme.muted
                     font.family: Theme.bodyFont
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.body
                 }
             }
             Item { Layout.fillWidth: true }
@@ -46,11 +46,11 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 18
                 spacing: 12
-                Text {
+                LabelSharp {
                     text: "БЫСТРЫЙ ЗАПУСК"
                     color: Theme.muted
                     font.family: Theme.monoFont
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.micro
                     font.letterSpacing: 1.2
                 }
                 RowLayout {
@@ -83,21 +83,21 @@ Item {
                                     height: 30
                                     radius: 10
                                     color: "#2E68A7FF"
-                                    Text {
+                                    LabelSharp {
                                         anchors.centerIn: parent
                                         text: modelData[0]
                                         color: Theme.accent
                                         font.family: Theme.monoFont
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.label
                                         font.weight: Font.Bold
                                     }
                                 }
-                                Text {
+                                LabelSharp {
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: modelData[1]
                                     color: Theme.text
                                     font.family: Theme.bodyFont
-                                    font.pixelSize: 13
+                                    font.pixelSize: Theme.body
                                     font.weight: Font.DemiBold
                                 }
                             }
@@ -134,13 +134,21 @@ Item {
                             placeholderText: "Найти приложение…"
                             placeholderTextColor: "#7388B2"
                             font.family: Theme.bodyFont
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.title
+                            renderType: Text.QtRendering
                             Accessible.name: "Поиск приложений"
                             background: Rectangle {
                                 radius: 12
                                 color: "#B4081734"
-                                border.width: searchField.activeFocus ? 1.5 : 1
+                                border.width: searchField.activeFocus ? 2 : 1
                                 border.color: searchField.activeFocus ? Theme.accent : Theme.border
+
+                                Behavior on border.width {
+                                    NumberAnimation { duration: Theme.durFocus; easing.type: Theme.easeOut }
+                                }
+                                Behavior on border.color {
+                                    ColorAnimation { duration: Theme.durFocus }
+                                }
                             }
                         }
                     }
@@ -179,28 +187,28 @@ Item {
                                     height: 27
                                     radius: 8
                                     color: "#2338A7FF"
-                                    Text {
+                                    LabelSharp {
                                         anchors.centerIn: parent
                                         text: modelData.name.length > 0 ? modelData.name.charAt(0).toUpperCase() : "A"
                                         color: Theme.accent
                                         font.family: Theme.headingFont
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.label
                                         font.weight: Font.Bold
                                     }
                                 }
-                                Text {
+                                LabelSharp {
                                     Layout.fillWidth: true
                                     text: modelData.name
                                     color: Theme.text
                                     elide: Text.ElideRight
                                     font.family: Theme.bodyFont
-                                    font.pixelSize: 13
+                                    font.pixelSize: Theme.body
                                 }
-                                Text {
+                                LabelSharp {
                                     text: "Открыть  →"
                                     color: programHover.hovered ? Theme.accent : Theme.muted
                                     font.family: Theme.bodyFont
-                                    font.pixelSize: 11
+                                    font.pixelSize: Theme.caption
                                 }
                             }
                             HoverHandler { id: programHover }
@@ -218,11 +226,11 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 18
                     spacing: 12
-                    Text {
+                    LabelSharp {
                         text: "ПЕРСОНАЛЬНЫЕ"
                         color: Theme.muted
                         font.family: Theme.monoFont
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.micro
                         font.letterSpacing: 1.2
                     }
 
@@ -247,18 +255,18 @@ Item {
                                 anchors.leftMargin: 15
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 4
-                                Text {
+                                LabelSmooth {
                                     text: modelData[1]
                                     color: Theme.text
                                     font.family: Theme.bodyFont
-                                    font.pixelSize: 14
+                                    font.pixelSize: Theme.title
                                     font.weight: Font.DemiBold
                                 }
-                                Text {
+                                LabelSharp {
                                     text: modelData[2]
                                     color: Theme.muted
                                     font.family: Theme.bodyFont
-                                    font.pixelSize: 11
+                                    font.pixelSize: Theme.caption
                                 }
                             }
                             HoverHandler { id: specialHover }
@@ -266,13 +274,13 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight: true }
-                    Text {
+                    LabelSharp {
                         Layout.fillWidth: true
                         text: "Пути пока используются из текущей конфигурации JARVIS."
                         color: "#657AA4"
                         wrapMode: Text.WordWrap
                         font.family: Theme.bodyFont
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.caption
                     }
                 }
             }
