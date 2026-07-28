@@ -104,6 +104,28 @@ class AssistantSpecialCommandTests(unittest.TestCase):
             ("камера", 100),
         )
 
+    def test_russian_program_aliases_match_installed_apps(self) -> None:
+        program_map = {
+            "steam": r"C:\Program Files (x86)\Steam\Steam.exe",
+            "telegram": "Telegram.TelegramDesktop",
+            "yandex": "Yandex.Browser",
+            "happ": r"C:\Program Files\Happ\Happ.exe",
+        }
+
+        aliases = {
+            "Стим": "steam",
+            "Телеграмм": "telegram",
+            "браузер": "yandex",
+            "Яндекс Браузер": "yandex",
+            "Хап": "happ",
+        }
+        for alias, expected in aliases.items():
+            with self.subTest(alias=alias):
+                self.assertEqual(
+                    assistant.find_program(alias, program_map),
+                    (expected, 100),
+                )
+
     @patch("assistant.current_jarvis_executable")
     def test_stale_jarvis_index_uses_current_executable(self, executable_mock) -> None:
         executable_mock.return_value = Path(r"A:\JARVIS\dist\assistant.exe")

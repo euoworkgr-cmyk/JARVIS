@@ -110,7 +110,12 @@ def reset_console() -> None:
 TRANSLIT_MAP = {
     "вс код": "vs code",
     "хром": "chrome",
+    "стим": "steam",
     "телеграм": "telegram",
+    "телеграмм": "telegram",
+    "браузер": "yandex",
+    "яндекс браузер": "yandex",
+    "хап": "happ",
     "дискорд": "discord",
     "ворд": "word",
     "эксель": "excel",
