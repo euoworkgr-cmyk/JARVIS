@@ -121,9 +121,18 @@ class DesktopAppSmokeTests(unittest.TestCase):
             self.assertTrue(first.start())
             self.assertFalse(second.start())
         finally:
-            if first.server is not None:
-                first.server.close()
-                first.server.removeServer(name)
+            first.close()
+
+    def test_new_instance_also_owns_legacy_instance_name(self) -> None:
+        current_name = f"Supersonic.Personal.Test.{uuid.uuid4().hex}"
+        legacy_name = f"JARVIS.Personal.Test.{uuid.uuid4().hex}"
+        current = SingleInstance(current_name, (legacy_name,))
+        legacy = SingleInstance(legacy_name)
+        try:
+            self.assertTrue(current.start())
+            self.assertFalse(legacy.start())
+        finally:
+            current.close()
 
 
 if __name__ == "__main__":

@@ -310,7 +310,7 @@ Item {
                                             sourceSize: Qt.size(40, 40)
                                             fillMode: Image.PreserveAspectFit
                                             smooth: true
-                                            cache: false
+                                            cache: true
                                         }
 
                                         Rectangle {

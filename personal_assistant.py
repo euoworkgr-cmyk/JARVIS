@@ -13,6 +13,7 @@ def main() -> int:
         load_pet=True,
         autostart_name="Supersonic",
         legacy_autostart_names=("JARVIS Personal",),
+        legacy_instance_names=("JARVIS.Personal.Instance",),
     )
 
 

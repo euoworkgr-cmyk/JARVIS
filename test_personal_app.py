@@ -15,7 +15,12 @@ from PySide6.QtQuick import QQuickWindow
 from PySide6.QtWidgets import QApplication
 
 from command_service import CommandOutcome, CommandRequest, CommandService, HistoryStore
-from desktop_app import _parse_icon_location, resolve_windows_icon_source
+from desktop_app import (
+    _parse_icon_location,
+    _resolve_windows_icon_source_cached,
+    ProgramIconProvider,
+    resolve_windows_icon_source,
+)
 from desktop_backend import DesktopBackend, _format_bytes
 
 
@@ -106,6 +111,11 @@ class PersonalAppTests(unittest.TestCase):
         target = r'C:\Program Files\Demo\Demo.exe'
         self.assertEqual(resolve_windows_icon_source(target), (target, 0))
 
+    def test_program_icons_are_loaded_off_the_gui_thread(self) -> None:
+        provider = ProgramIconProvider(DesktopBackend(Path(__file__).resolve().parent))
+
+        self.assertIn("ForceAsynchronous", str(provider.flags()))
+
     @patch("desktop_app.subprocess.run")
     def test_shortcut_icon_uses_original_source_without_overlay(self, run_mock) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -116,7 +126,7 @@ class PersonalAppTests(unittest.TestCase):
             run_mock.return_value.stdout = json.dumps(
                 {"TargetPath": str(icon), "IconLocation": f"{icon},3"}
             )
-            resolve_windows_icon_source.cache_clear()
+            _resolve_windows_icon_source_cached.cache_clear()
 
             source = resolve_windows_icon_source(str(shortcut))
 

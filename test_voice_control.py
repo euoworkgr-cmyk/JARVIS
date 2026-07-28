@@ -3,8 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 
-from voice_control import VoiceConfig, VoiceSetupError, confirmation_intent, normalize_transcript
+from voice_control import (
+    VoiceConfig,
+    VoicePipeline,
+    VoiceSetupError,
+    confirmation_intent,
+    normalize_transcript,
+)
 
 
 class VoiceControlTests(unittest.TestCase):
@@ -38,6 +45,62 @@ class VoiceControlTests(unittest.TestCase):
 
         self.assertEqual(config.whisper_model.name, "ggml-small.bin")
         self.assertLess(config.wake_threshold, 0.5)
+
+    @patch("voice_control.WhisperCppRecognizer")
+    @patch("voice_control.SoundDeviceMicrophone", side_effect=VoiceSetupError("denied"))
+    def test_denied_microphone_does_not_start_whisper(
+        self, _microphone_mock, whisper_mock
+    ) -> None:
+        config = MagicMock(enabled=True)
+        pipeline = VoicePipeline(
+            config,
+            on_status=MagicMock(),
+            on_command=MagicMock(),
+            on_confirm=MagicMock(),
+            on_cancel=MagicMock(),
+        )
+
+        pipeline.run()
+
+        whisper_mock.assert_not_called()
+        self.assertEqual(pipeline.on_status.call_count, 1)
+
+    def test_transient_voice_failures_use_bounded_backoff(self) -> None:
+        config = MagicMock(enabled=True)
+        statuses = MagicMock()
+        pipeline = VoicePipeline(
+            config,
+            on_status=statuses,
+            on_command=MagicMock(),
+            on_confirm=MagicMock(),
+            on_cancel=MagicMock(),
+        )
+        pipeline._run_once = MagicMock(side_effect=RuntimeError("busy"))
+        pipeline._stop.wait = MagicMock(return_value=False)
+
+        pipeline.run()
+
+        self.assertEqual(
+            [call.args[0] for call in pipeline._stop.wait.call_args_list],
+            [4.0, 15.0, 60.0],
+        )
+        self.assertEqual(pipeline._run_once.call_count, 4)
+        self.assertEqual(statuses.call_args.args[0], "disabled")
+
+    def test_stop_cancels_active_recognizer(self) -> None:
+        pipeline = VoicePipeline(
+            MagicMock(enabled=True),
+            on_status=MagicMock(),
+            on_command=MagicMock(),
+            on_confirm=MagicMock(),
+            on_cancel=MagicMock(),
+        )
+        recognizer = MagicMock()
+        pipeline._recognizer = recognizer
+
+        pipeline.stop()
+
+        recognizer.close.assert_called_once_with()
 
 
 if __name__ == "__main__":

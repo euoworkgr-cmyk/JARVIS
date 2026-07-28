@@ -406,6 +406,8 @@ def confirmation_intent(value: str) -> bool | None:
 
 
 class VoicePipeline:
+    RETRY_DELAYS = (4.0, 15.0, 60.0)
+
     def __init__(
         self,
         config: VoiceConfig,
@@ -423,9 +425,14 @@ class VoicePipeline:
         self._stop = threading.Event()
         self._accept_outcomes = threading.Event()
         self._outcomes: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=2)
+        self._recognizer: WhisperCppRecognizer | None = None
+        self._recognizer_lock = threading.Lock()
 
     def stop(self) -> None:
         self._stop.set()
+        with self._recognizer_lock:
+            if self._recognizer is not None:
+                self._recognizer.close()
 
     def submit_outcome(self, outcome: dict[str, Any]) -> None:
         if not self._accept_outcomes.is_set():
@@ -448,37 +455,58 @@ class VoicePipeline:
         except Exception as error:
             self.on_status("error", str(error))
             return
-        while not self._stop.is_set():
+        for attempt in range(len(self.RETRY_DELAYS) + 1):
+            if self._stop.is_set():
+                return
             try:
                 self._run_once()
                 return
+            except VoiceSetupError as error:
+                self.on_status("error", str(error))
+                return
             except Exception as error:
                 self.on_status("error", str(error))
-                if self._stop.wait(4.0):
+                if attempt >= len(self.RETRY_DELAYS):
+                    self.on_status(
+                        "disabled",
+                        "Голосовое управление остановлено. Запустите повтор вручную.",
+                    )
+                    return
+                if self._stop.wait(self.RETRY_DELAYS[attempt]):
                     return
                 self.on_status("restarting", "Переподключаю голосовое управление")
 
     def _run_once(self) -> None:
-        recognizer: WhisperCppRecognizer | None = None
-        try:
-            wake = OpenWakeWordDetector(
-                self.config.wake_model,
-                self.config.wake_melspec_model,
-                self.config.wake_embedding_model,
-                self.config.wake_threshold,
-            )
-            vad = SileroVoiceActivityDetector(
-                self.config.vad_model, self.config.vad_threshold
-            )
-            speaker = LocalSpeaker()
-            recognizer = WhisperCppRecognizer(
-                self.config.whisper_executable, self.config.whisper_model
-            )
-            with SoundDeviceMicrophone(self.config.microphone_device) as microphone:
+        with SoundDeviceMicrophone(self.config.microphone_device) as microphone:
+            recognizer: WhisperCppRecognizer | None = None
+            try:
+                try:
+                    wake = OpenWakeWordDetector(
+                        self.config.wake_model,
+                        self.config.wake_melspec_model,
+                        self.config.wake_embedding_model,
+                        self.config.wake_threshold,
+                    )
+                    vad = SileroVoiceActivityDetector(
+                        self.config.vad_model, self.config.vad_threshold
+                    )
+                    speaker = LocalSpeaker()
+                    recognizer = WhisperCppRecognizer(
+                        self.config.whisper_executable, self.config.whisper_model
+                    )
+                except VoiceSetupError:
+                    raise
+                except Exception as error:
+                    raise VoiceSetupError(str(error)) from error
+                with self._recognizer_lock:
+                    self._recognizer = recognizer
                 self._run_loop(microphone, wake, vad, recognizer, speaker)
-        finally:
-            if recognizer is not None:
-                recognizer.close()
+            finally:
+                with self._recognizer_lock:
+                    if self._recognizer is recognizer:
+                        self._recognizer = None
+                if recognizer is not None:
+                    recognizer.close()
 
     def _run_loop(
         self,

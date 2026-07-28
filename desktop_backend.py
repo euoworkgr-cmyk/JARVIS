@@ -18,6 +18,7 @@ from PySide6.QtGui import QGuiApplication, QWindow
 import assistant
 from command_service import CommandOutcome, CommandService, NotesStore
 from desktop_pet import WINDOW_SIZE, Point, clamp_position, default_position, get_work_areas, load_position, pet_state_path, save_position
+from user_settings import AppSettings, set_windows_autostart
 
 
 PRESET_DISPLAY_TITLES = {
@@ -191,13 +192,21 @@ class DesktopBackend(QObject):
     quittingChanged = Signal()
     systemStatsChanged = Signal()
     voiceStatusChanged = Signal()
+    preferencesChanged = Signal()
     commandOutcome = Signal(object)
 
     showMainRequested = Signal()
     helpRequested = Signal()
     quitRequested = Signal()
 
-    def __init__(self, resource_directory: Path) -> None:
+    def __init__(
+        self,
+        resource_directory: Path,
+        *,
+        autostart_name: str | None = None,
+        legacy_autostart_names: tuple[str, ...] = (),
+        settings: AppSettings | None = None,
+    ) -> None:
         super().__init__()
         self.resource_directory = resource_directory
         self.service = CommandService()
@@ -243,6 +252,20 @@ class DesktopBackend(QObject):
         self._stats_refreshing = False
         self._voice_controller = None
         self._voice_status = "disabled"
+        self._settings = settings or AppSettings()
+        self._autostart_name = autostart_name
+        self._legacy_autostart_names = legacy_autostart_names
+        self._autostart_enabled = self._settings.get_bool("autostartEnabled")
+        self._voice_startup_enabled = self._settings.get_bool("voiceStartupEnabled")
+        self._preference_error = ""
+        if self._autostart_name:
+            success, error = set_windows_autostart(
+                self._autostart_name,
+                self._autostart_enabled,
+                self._legacy_autostart_names,
+            )
+            if self._autostart_enabled and not success:
+                self._preference_error = error
         self._voice_status_label = "Голосовое управление не запущено"
         self._stats_timer = QTimer(self)
         self._stats_timer.setInterval(3000)
@@ -547,6 +570,18 @@ class DesktopBackend(QObject):
     def voiceStatusLabel(self) -> str:
         return self._voice_status_label
 
+    @Property(bool, notify=preferencesChanged)
+    def autostartEnabled(self) -> bool:
+        return self._autostart_enabled
+
+    @Property(bool, notify=preferencesChanged)
+    def voiceStartupEnabled(self) -> bool:
+        return self._voice_startup_enabled
+
+    @Property(str, notify=preferencesChanged)
+    def preferenceError(self) -> str:
+        return self._preference_error
+
     @Property(str, notify=currentPageChanged)
     def currentPage(self) -> str:
         return self._current_page
@@ -755,6 +790,73 @@ class DesktopBackend(QObject):
         self._voice_controller = controller
         controller.start()
 
+    @Slot()
+    def startConfiguredVoiceControl(self) -> None:
+        if self._voice_startup_enabled:
+            self.startVoiceControl()
+
+    @Slot(bool)
+    def setVoiceStartupEnabled(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        if enabled == self._voice_startup_enabled:
+            return
+        try:
+            self._settings.set_bool("voiceStartupEnabled", enabled)
+        except OSError as error:
+            self._preference_error = str(error)
+            self.preferencesChanged.emit()
+            return
+        self._voice_startup_enabled = enabled
+        self._preference_error = ""
+        if enabled:
+            self.startVoiceControl()
+        else:
+            self.stopVoiceControl()
+        self.preferencesChanged.emit()
+
+    @Slot(bool)
+    def setAutostartEnabled(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        if not self._autostart_name:
+            self._preference_error = "Автозапуск недоступен для этой сборки"
+            self.preferencesChanged.emit()
+            return
+        success, error = set_windows_autostart(
+            self._autostart_name, enabled, self._legacy_autostart_names
+        )
+        if not success:
+            self._preference_error = error
+            self.preferencesChanged.emit()
+            return
+        try:
+            self._settings.set_bool("autostartEnabled", enabled)
+        except OSError as error:
+            set_windows_autostart(
+                self._autostart_name,
+                self._autostart_enabled,
+                self._legacy_autostart_names,
+            )
+            self._preference_error = str(error)
+            self.preferencesChanged.emit()
+            return
+        self._autostart_enabled = enabled
+        self._preference_error = ""
+        self.preferencesChanged.emit()
+
+    @Slot()
+    def retryVoiceControl(self) -> None:
+        self.stopVoiceControl()
+        self.startVoiceControl()
+
+    @Slot()
+    def stopVoiceControl(self) -> None:
+        if self._voice_controller is None:
+            return
+        controller = self._voice_controller
+        self._voice_controller = None
+        controller.stop()
+        self._set_voice_status("disabled", "Голосовое управление выключено")
+
     @Slot(str, str)
     def _set_voice_status(self, status: str, label: str) -> None:
         self._voice_status = status
@@ -888,6 +990,7 @@ class DesktopBackend(QObject):
         self._stats_timer.stop()
         if self._voice_controller is not None:
             self._voice_controller.stop()
+            self._voice_controller = None
         self.thread_pool.waitForDone(timeout_ms)
 
     def _programs_refreshed(self, outcome: CommandOutcome) -> None:

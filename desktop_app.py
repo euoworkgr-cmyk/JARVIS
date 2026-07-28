@@ -17,6 +17,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickWindow, QSGRendererInterf
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu, QSystemTrayIcon
 
 from desktop_backend import DesktopBackend
+from user_settings import configure_data_directory
 
 
 INSTANCE_NAME = "Supersonic.Desktop.Instance"
@@ -35,12 +36,24 @@ def _parse_icon_location(value: str) -> tuple[str, int]:
     return location, 0
 
 
-@lru_cache(maxsize=128)
 def resolve_windows_icon_source(target: str) -> tuple[str, int]:
     """Resolve a .lnk to its original icon source without the shortcut overlay."""
     path = Path(target)
     if os.name != "nt" or path.suffix.casefold() != ".lnk":
         return target, 0
+
+    try:
+        modified_ns = path.stat().st_mtime_ns
+    except OSError:
+        modified_ns = 0
+    return _resolve_windows_icon_source_cached(target, modified_ns)
+
+
+@lru_cache(maxsize=128)
+def _resolve_windows_icon_source_cached(
+    target: str, _modified_ns: int
+) -> tuple[str, int]:
+    path = Path(target)
 
     environment = os.environ.copy()
     environment["SUPERSONIC_SHORTCUT_PATH"] = str(path)
@@ -88,39 +101,14 @@ def resolve_windows_icon_source(target: str) -> tuple[str, int]:
     return target, 0
 
 
-def ensure_windows_autostart(
-    value_name: str,
-    legacy_value_names: tuple[str, ...] = (),
-) -> bool:
-    """Register the frozen desktop build for background startup at user logon."""
-    if os.name != "nt" or not getattr(sys, "frozen", False):
-        return False
-    try:
-        import winreg
-
-        command = f'"{Path(sys.executable).resolve()}"'
-        with winreg.CreateKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-        ) as key:
-            winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, command)
-            for legacy_name in legacy_value_names:
-                if legacy_name == value_name:
-                    continue
-                try:
-                    winreg.DeleteValue(key, legacy_name)
-                except FileNotFoundError:
-                    pass
-        return True
-    except OSError:
-        return False
-
-
 class ProgramIconProvider(QQuickImageProvider):
     """Expose native Windows program icons to QML without writing cache files."""
 
     def __init__(self, backend: DesktopBackend) -> None:
-        super().__init__(QQuickImageProvider.ImageType.Pixmap)
+        super().__init__(
+            QQuickImageProvider.ImageType.Pixmap,
+            QQuickImageProvider.Flag.ForceAsynchronousImageLoading,
+        )
         self.backend = backend
         self.file_icons = QFileIconProvider()
 
@@ -227,33 +215,47 @@ def resource_directory() -> Path:
 class SingleInstance(QObject):
     activationRequested = Signal()
 
-    def __init__(self, name: str = INSTANCE_NAME) -> None:
+    def __init__(
+        self, name: str = INSTANCE_NAME, legacy_names: tuple[str, ...] = ()
+    ) -> None:
         super().__init__()
         self.name = name
         self.server: QLocalServer | None = None
+        self.servers: list[QLocalServer] = []
+        self.names = tuple(dict.fromkeys((name, *legacy_names)))
 
     def start(self) -> bool:
-        socket = QLocalSocket(self)
-        socket.connectToServer(self.name, QIODevice.WriteOnly)
-        if socket.waitForConnected(250):
-            socket.write(b"show")
-            socket.flush()
-            socket.waitForBytesWritten(250)
-            socket.disconnectFromServer()
-            return False
+        for name in self.names:
+            socket = QLocalSocket(self)
+            socket.connectToServer(name, QIODevice.WriteOnly)
+            if socket.waitForConnected(250):
+                socket.write(b"show")
+                socket.flush()
+                socket.waitForBytesWritten(250)
+                socket.disconnectFromServer()
+                return False
 
-        QLocalServer.removeServer(self.name)
-        self.server = QLocalServer(self)
-        if not self.server.listen(self.name):
-            return False
-        self.server.newConnection.connect(self._read_activation)
+        for name in self.names:
+            QLocalServer.removeServer(name)
+            server = QLocalServer(self)
+            if not server.listen(name):
+                self.close()
+                return False
+            server.newConnection.connect(lambda server=server: self._read_activation(server))
+            self.servers.append(server)
+        self.server = self.servers[0]
         return True
 
-    def _read_activation(self) -> None:
-        if self.server is None:
-            return
-        while self.server.hasPendingConnections():
-            socket = self.server.nextPendingConnection()
+    def close(self) -> None:
+        for name, server in zip(self.names, self.servers):
+            server.close()
+            QLocalServer.removeServer(name)
+        self.servers.clear()
+        self.server = None
+
+    def _read_activation(self, server: QLocalServer) -> None:
+        while server.hasPendingConnections():
+            socket = server.nextPendingConnection()
             socket.waitForReadyRead(100)
             socket.readAll()
             socket.disconnectFromServer()
@@ -313,6 +315,7 @@ def run_desktop_app(
     load_pet: bool = True,
     autostart_name: str | None = None,
     legacy_autostart_names: tuple[str, ...] = (),
+    legacy_instance_names: tuple[str, ...] = (),
 ) -> int:
     resources = resource_directory()
     installation_directory = (
@@ -320,7 +323,7 @@ def run_desktop_app(
         if getattr(sys, "frozen", False)
         else resources
     )
-    os.environ.setdefault("JARVIS_DATA_DIR", str(installation_directory / "data"))
+    configure_data_directory(installation_directory)
     os.environ.setdefault(
         "QML_DISK_CACHE_PATH", str(installation_directory / ".cache" / "qml")
     )
@@ -345,13 +348,14 @@ def run_desktop_app(
     app.setOrganizationName("Supersonic")
     app.setQuitOnLastWindowClosed(False)
 
-    single_instance = SingleInstance(instance_name)
+    single_instance = SingleInstance(instance_name, legacy_instance_names)
     if not single_instance.start():
         return 0
-    if autostart_name:
-        ensure_windows_autostart(autostart_name, legacy_autostart_names)
-
-    backend = DesktopBackend(resources)
+    backend = DesktopBackend(
+        resources,
+        autostart_name=autostart_name,
+        legacy_autostart_names=legacy_autostart_names,
+    )
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("backend", backend)
     engine.addImageProvider("programicons", ProgramIconProvider(backend))
@@ -370,7 +374,7 @@ def run_desktop_app(
         return 2
 
     backend.set_main_window(main_window)
-    backend.startVoiceControl()
+    backend.startConfiguredVoiceControl()
 
     def keep_pet_visible(visibility: QWindow.Visibility) -> None:
         if pet_window is not None and visibility == QWindow.Visibility.Minimized and backend.petVisible:
