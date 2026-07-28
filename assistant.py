@@ -429,13 +429,13 @@ def open_program(program_name: str, program_map: dict[str, str]) -> LaunchResult
 
 def extract_program_name(command: str) -> str:
     value = " ".join(command.strip().split())
-    lowered = value.lower()
-    for prefix in ("открой", "запусти", "open", "run"):
-        if lowered == prefix:
-            return ""
-        marker = f"{prefix} "
-        if lowered.startswith(marker):
-            return value[len(marker) :].strip()
+    launch_prefix = re.match(
+        r"^(?:открой|откройте|откроем|открыть|запусти|запустите|запустим|запустить|open|run)\b[\s,.:;!?—–-]*",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if launch_prefix is not None:
+        return value[launch_prefix.end() :].strip()
     return value
 
 

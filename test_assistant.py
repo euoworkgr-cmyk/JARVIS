@@ -126,6 +126,17 @@ class AssistantSpecialCommandTests(unittest.TestCase):
                     (expected, 100),
                 )
 
+    def test_spoken_launch_prefixes_and_punctuation_are_removed(self) -> None:
+        commands = {
+            "Откроем Браузер": "Браузер",
+            "Открой, Браузер": "Браузер",
+            "Откройте Яндекс Браузер": "Яндекс Браузер",
+            "Запустим Стим": "Стим",
+        }
+        for command, expected in commands.items():
+            with self.subTest(command=command):
+                self.assertEqual(assistant.extract_program_name(command), expected)
+
     @patch("assistant.current_jarvis_executable")
     def test_stale_jarvis_index_uses_current_executable(self, executable_mock) -> None:
         executable_mock.return_value = Path(r"A:\JARVIS\dist\assistant.exe")
