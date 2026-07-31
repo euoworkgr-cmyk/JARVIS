@@ -1,0 +1,4 @@
+module JarvisDesktop
+singleton Theme 1.0 Theme.qml
+LabelSharp 1.0 LabelSharp.qml
+LabelSmooth 1.0 LabelSmooth.qml

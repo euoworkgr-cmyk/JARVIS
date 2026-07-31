@@ -1,0 +1,3 @@
+module JarvisPersonal
+singleton PersonalTheme 1.0 PersonalTheme.qml
+PersonalCustomizationPage 1.0 PersonalCustomizationPage.qml

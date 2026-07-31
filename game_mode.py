@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import argparse
 import ctypes
+from difflib import SequenceMatcher
 import json
 import math
 import os
@@ -345,6 +346,70 @@ def _request_window_close(processes: list[psutil.Process]) -> None:
     user32.EnumWindows(close_window, 0)
 
 
+def _process_name_score(query: str, process_name: str) -> int:
+    normalized_query = query.casefold().removesuffix(".exe").strip()
+    normalized_name = process_name.casefold().removesuffix(".exe").strip()
+    if not normalized_query or not normalized_name:
+        return 0
+    if normalized_query == normalized_name:
+        return 100
+    if normalized_query in normalized_name or normalized_name in normalized_query:
+        return 92
+    return round(SequenceMatcher(None, normalized_query, normalized_name).ratio() * 100)
+
+
+def scan_named_processes(query: str, match_threshold: int = 72) -> GameModeScan:
+    """Find complete non-protected application trees matching a kill query."""
+    protected_pids = _protected_pids()
+    matches: list[tuple[int, ProcessCandidate]] = []
+
+    for process in psutil.process_iter(["pid", "name", "create_time"]):
+        try:
+            pid = int(process.info["pid"])
+            name = str(process.info["name"] or f"PID {pid}")
+        except (psutil.Error, TypeError, ValueError):
+            continue
+        if _is_protected(pid, name, protected_pids):
+            continue
+
+        root = _find_application_root(process, protected_pids)
+        try:
+            root_pid = root.pid
+            root_name = root.name()
+            root_create_time = root.create_time()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
+            continue
+        if _is_protected(root_pid, root_name, protected_pids):
+            continue
+
+        score = _process_name_score(query, root_name)
+        if score < match_threshold:
+            continue
+        matches.append(
+            (
+                score,
+                ProcessCandidate(
+                    pid=root_pid,
+                    name=root_name,
+                    create_time=root_create_time,
+                    gpu_usage=0.0,
+                    reason=f"kill · совпадение {score}%",
+                ),
+            )
+        )
+
+    if not matches:
+        return GameModeScan([], False)
+
+    best_score = max(score for score, _candidate in matches)
+    unique: dict[tuple[int, float], ProcessCandidate] = {}
+    for score, candidate in matches:
+        if score == best_score:
+            unique[(candidate.pid, candidate.create_time)] = candidate
+    candidates = sorted(unique.values(), key=lambda item: (item.name.casefold(), item.pid))
+    return GameModeScan(candidates, False)
+
+
 def _is_process_running(process: psutil.Process) -> bool:
     try:
         return process.is_running()
@@ -371,8 +436,10 @@ def terminate_processes(
     candidates: list[ProcessCandidate],
     graceful_timeout: float = 4.0,
     force_timeout: float = 2.0,
+    *,
+    force: bool = False,
 ) -> GameModeResult:
-    """Validate app roots, then close each root and its complete process tree."""
+    """Validate app roots, then close or force-kill each complete process tree."""
     closed: list[ProcessCandidate] = []
     failed_by_pid: dict[int, list[str]] = {}
     precheck_failed_pids: set[int] = set()
@@ -412,26 +479,30 @@ def terminate_processes(
             owner_by_identity[identity] = candidate
 
     all_processes = list(process_by_identity.values())
-    _request_window_close(all_processes)
-    _gone, alive = psutil.wait_procs(all_processes, timeout=graceful_timeout)
+    if force:
+        alive = all_processes
+    else:
+        _request_window_close(all_processes)
+        _gone, alive = psutil.wait_procs(all_processes, timeout=graceful_timeout)
 
-    terminating: list[psutil.Process] = []
-    for process in alive:
-        try:
-            identity = (process.pid, process.create_time())
-            candidate = owner_by_identity[identity]
-        except (KeyError, psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
-            continue
-        try:
-            process.terminate()
-            terminating.append(process)
-        except psutil.NoSuchProcess:
-            pass
-        except (psutil.AccessDenied, psutil.Error) as error:
-            failed_by_pid.setdefault(candidate.pid, []).append(str(error))
+        terminating: list[psutil.Process] = []
+        for process in alive:
+            try:
+                identity = (process.pid, process.create_time())
+                candidate = owner_by_identity[identity]
+            except (KeyError, psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
+                continue
+            try:
+                process.terminate()
+                terminating.append(process)
+            except psutil.NoSuchProcess:
+                pass
+            except (psutil.AccessDenied, psutil.Error) as error:
+                failed_by_pid.setdefault(candidate.pid, []).append(str(error))
 
-    _gone, alive = psutil.wait_procs(terminating, timeout=force_timeout)
+        _gone, alive = psutil.wait_procs(terminating, timeout=force_timeout)
 
+    killed: list[psutil.Process] = []
     for process in alive:
         try:
             identity = (process.pid, process.create_time())
@@ -440,11 +511,22 @@ def terminate_processes(
             continue
         try:
             process.kill()
-            process.wait(timeout=force_timeout)
+            killed.append(process)
         except psutil.NoSuchProcess:
             pass
-        except (psutil.AccessDenied, psutil.TimeoutExpired, psutil.Error) as error:
+        except (psutil.AccessDenied, psutil.Error) as error:
             failed_by_pid.setdefault(candidate.pid, []).append(str(error))
+
+    _gone, alive = psutil.wait_procs(killed, timeout=force_timeout)
+    for process in alive:
+        try:
+            identity = (process.pid, process.create_time())
+            candidate = owner_by_identity[identity]
+        except (KeyError, psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
+            continue
+        failed_by_pid.setdefault(candidate.pid, []).append(
+            f"Процесс PID {process.pid} не завершился после kill."
+        )
 
     initially_closed = {candidate.pid for candidate in closed}
     for candidate in candidates:
@@ -473,9 +555,11 @@ def terminate_processes(
 def activate_game_mode(
     scan: GameModeScan | None = None,
     gpu_threshold: float = DEFAULT_GPU_THRESHOLD,
+    *,
+    force: bool = False,
 ) -> GameModeResult:
     current_scan = scan or scan_game_mode(gpu_threshold)
-    return terminate_processes(current_scan.candidates)
+    return terminate_processes(current_scan.candidates, force=force)
 
 
 def _print_scan(scan: GameModeScan) -> None:
@@ -495,7 +579,7 @@ def main() -> int:
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8")
 
-    parser = argparse.ArgumentParser(description="JARVIS Game Mode")
+    parser = argparse.ArgumentParser(description="Supersonic Game Mode")
     parser.add_argument("--yes", action="store_true", help="закрыть без подтверждения")
     parser.add_argument("--preview", action="store_true", help="только показать процессы")
     parser.add_argument("--threshold", type=float, default=DEFAULT_GPU_THRESHOLD)
@@ -508,7 +592,9 @@ def main() -> int:
 
     if not args.yes:
         try:
-            answer = input("Закрыть эти процессы? [д/Н]: ").strip().casefold()
+            answer = input(
+                "Принудительно завершить эти приложения? [д/Н]: "
+            ).strip().casefold()
         except (EOFError, KeyboardInterrupt):
             print("\nОтменено.")
             return 0
