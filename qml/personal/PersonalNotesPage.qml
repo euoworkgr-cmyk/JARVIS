@@ -68,7 +68,7 @@ Item {
                     implicitWidth: 112
                     implicitHeight: 38
                     radius: PersonalTheme.radiusSmall
-                    color: clearButton.hovered ? "#3B2927" : PersonalTheme.surface
+                    color: clearButton.hovered ? PersonalTheme.dangerSurface : PersonalTheme.surface
                     border.width: clearButton.activeFocus ? 2 : 1
                     border.color: clearButton.activeFocus
                                   ? PersonalTheme.danger : PersonalTheme.border
@@ -401,7 +401,7 @@ Item {
                                 implicitWidth: 36
                                 implicitHeight: 36
                                 radius: PersonalTheme.radiusSmall
-                                color: deleteButton.hovered ? "#3B2927" : "transparent"
+                                color: deleteButton.hovered ? PersonalTheme.dangerSurface : "transparent"
                             }
                         }
                     }
@@ -495,7 +495,7 @@ Item {
                         implicitWidth: 104
                         implicitHeight: 38
                         radius: PersonalTheme.radiusSmall
-                        color: confirmClearButton.hovered ? "#56302D" : "#452725"
+                        color: confirmClearButton.hovered ? PersonalTheme.dangerSurfaceStrong : PersonalTheme.dangerSurface
                         border.width: 1
                         border.color: PersonalTheme.danger
                     }

@@ -41,7 +41,10 @@ ApplicationWindow {
         )
     }
 
-    Component.onCompleted: Shared.Theme.reducedMotion = backend.reducedMotion
+    Component.onCompleted: {
+        Shared.Theme.reducedMotion = backend.reducedMotion
+        PersonalTheme.activeScheme = backend.colorScheme
+    }
 
     onClosing: function(close) {
         if (!backend.quitting) {
@@ -52,6 +55,7 @@ ApplicationWindow {
 
     Connections {
         target: backend
+        function onPreferencesChanged() { PersonalTheme.activeScheme = backend.colorScheme }
         function onHelpRequested() { backend.setPage("settings") }
         function onCurrentPageChanged() { window.showPage(backend.currentPage) }
         function onPendingActionChanged() {
@@ -155,7 +159,7 @@ ApplicationWindow {
                         width: 48
                         height: titleBar.height
                         color: buttonHover.hovered
-                               ? (modelData.action === "close" ? "#55302E" : PersonalTheme.surfaceHover)
+                               ? (modelData.action === "close" ? PersonalTheme.dangerSurfaceStrong : PersonalTheme.surfaceHover)
                                : "transparent"
                         Accessible.role: Accessible.Button
                         Accessible.name: modelData.label
@@ -267,12 +271,7 @@ ApplicationWindow {
         }
         Component {
             id: customizationPageComponent
-            PersonalPlaceholderPage {
-                property string pageKey: "customization"
-                pageTitle: "Кастомизация"
-                pageDescription: "Здесь появятся темы, фоновые рисунки и параметры визуального поведения. Структура personal-версии уже отделена от палитры, поэтому новые темы не потребуют переделки экранов."
-                symbol: "◌"
-            }
+            PersonalCustomizationPage { property string pageKey: "customization" }
         }
         Component {
             id: settingsPageComponent

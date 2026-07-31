@@ -77,6 +77,7 @@ class AppSettings:
     DEFAULTS = {
         "autostartEnabled": False,
         "voiceStartupEnabled": False,
+        "colorScheme": "dark",
     }
 
     def __init__(self, path: Path | None = None) -> None:
@@ -102,6 +103,16 @@ class AppSettings:
 
     def set_bool(self, name: str, value: bool) -> None:
         self._values[name] = bool(value)
+        self._save()
+
+    def get_str(self, name: str) -> str:
+        return str(self._values.get(name, self.DEFAULTS.get(name, "")))
+
+    def set_str(self, name: str, value: str) -> None:
+        self._values[name] = str(value)
+        self._save()
+
+    def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         try:

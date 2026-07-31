@@ -197,11 +197,11 @@ Item {
                                         width: 16
                                         height: 16
                                         name: "send"
-                                        color: "#17190F"
+                                        color: PersonalTheme.onAccent
                                     }
                                     Shared.LabelSharp {
                                         text: backend.busy ? "Выполняю" : "Запустить"
-                                        color: "#17190F"
+                                        color: PersonalTheme.onAccent
                                         font.family: PersonalTheme.bodyFont
                                         font.pixelSize: PersonalTheme.caption
                                         font.weight: Font.DemiBold

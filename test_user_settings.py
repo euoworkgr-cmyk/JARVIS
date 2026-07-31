@@ -79,6 +79,7 @@ class UserSettingsTests(unittest.TestCase):
 
             self.assertFalse(backend.autostartEnabled)
             self.assertFalse(backend.voiceStartupEnabled)
+            self.assertEqual(backend.colorScheme, "dark")
             autostart_mock.assert_called_once_with(
                 "Supersonic", False, ("JARVIS Personal",)
             )
@@ -101,6 +102,10 @@ class UserSettingsTests(unittest.TestCase):
             )
             self.assertFalse(backend.autostartEnabled)
             self.assertFalse(backend.voiceStartupEnabled)
+
+            backend.setColorScheme("light")
+            self.assertEqual(backend.colorScheme, "light")
+            self.assertEqual(settings.get_str("colorScheme"), "light")
 
     @patch("desktop_backend.set_windows_autostart", return_value=(False, "denied"))
     def test_registry_error_is_visible_and_does_not_enable_autostart(

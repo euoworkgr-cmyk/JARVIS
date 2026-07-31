@@ -257,6 +257,8 @@ class DesktopBackend(QObject):
         self._legacy_autostart_names = legacy_autostart_names
         self._autostart_enabled = self._settings.get_bool("autostartEnabled")
         self._voice_startup_enabled = self._settings.get_bool("voiceStartupEnabled")
+        stored_color_scheme = self._settings.get_str("colorScheme")
+        self._color_scheme = stored_color_scheme if stored_color_scheme in {"dark", "light"} else "dark"
         self._preference_error = ""
         if self._autostart_name:
             success, error = set_windows_autostart(
@@ -579,6 +581,10 @@ class DesktopBackend(QObject):
         return self._voice_startup_enabled
 
     @Property(str, notify=preferencesChanged)
+    def colorScheme(self) -> str:
+        return self._color_scheme
+
+    @Property(str, notify=preferencesChanged)
     def preferenceError(self) -> str:
         return self._preference_error
 
@@ -812,6 +818,21 @@ class DesktopBackend(QObject):
             self.startVoiceControl()
         else:
             self.stopVoiceControl()
+        self.preferencesChanged.emit()
+
+    @Slot(str)
+    def setColorScheme(self, scheme: str) -> None:
+        scheme = str(scheme).strip().casefold()
+        if scheme not in {"dark", "light"} or scheme == self._color_scheme:
+            return
+        try:
+            self._settings.set_str("colorScheme", scheme)
+        except OSError as error:
+            self._preference_error = str(error)
+            self.preferencesChanged.emit()
+            return
+        self._color_scheme = scheme
+        self._preference_error = ""
         self.preferencesChanged.emit()
 
     @Slot(bool)

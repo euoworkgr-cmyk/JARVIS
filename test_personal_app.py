@@ -39,6 +39,7 @@ class PersonalAppTests(unittest.TestCase):
         self.assertIn('title: "Supersonic"', personal_source)
         self.assertIn('label: "Заметки"', personal_source)
         self.assertIn('PersonalNotesPage', personal_source)
+        self.assertIn('PersonalCustomizationPage', personal_source)
         self.assertIn("load_pet=True", (root / "personal_assistant.py").read_text(encoding="utf-8"))
 
         engine = QQmlApplicationEngine()
