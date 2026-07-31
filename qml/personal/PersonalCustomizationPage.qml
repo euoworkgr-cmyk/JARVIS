@@ -1,12 +1,42 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import "."
 import ".." as Shared
 
 Item {
-    ColumnLayout {
+    id: root
+    property var draftActions: []
+    readonly property var actionTypes: [
+        { type: "launch", title: "Открыть программу", needsTarget: true },
+        { type: "close", title: "Закрыть программу", needsTarget: true },
+        { type: "volume_up", title: "Сделать громче", needsTarget: false },
+        { type: "volume_down", title: "Сделать тише", needsTarget: false },
+        { type: "volume_mute", title: "Включить / выключить звук", needsTarget: false },
+        { type: "show_desktop", title: "Показать рабочий стол", needsTarget: false },
+        { type: "lock_pc", title: "Заблокировать ПК", needsTarget: false },
+        { type: "sleep", title: "Перевести ПК в спящий режим", needsTarget: false },
+        { type: "shutdown", title: "Выключить ПК", needsTarget: false },
+        { type: "restart", title: "Перезагрузить ПК", needsTarget: false }
+    ]
+
+    function actionTitle(action) {
+        for (let index = 0; index < actionTypes.length; ++index) {
+            if (actionTypes[index].type === action.type)
+                return actionTypes[index].title
+        }
+        return action.type
+    }
+
+    ScrollView {
+        id: customizationScroll
         anchors.fill: parent
-        spacing: PersonalTheme.spacingLarge
+        contentWidth: availableWidth
+        clip: true
+
+        ColumnLayout {
+            width: customizationScroll.availableWidth
+            spacing: PersonalTheme.spacingLarge
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -95,6 +125,221 @@ Item {
             }
         }
 
-        Item { Layout.fillHeight: true }
+            Rectangle { Layout.fillWidth: true; height: 1; color: PersonalTheme.border }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Shared.LabelSmooth {
+                    text: "Настройка протоколов"
+                    color: PersonalTheme.text
+                    font.family: PersonalTheme.displayFont
+                    font.pixelSize: PersonalTheme.title
+                }
+                Shared.LabelSharp {
+                    text: "Одна кодовая фраза запускает цепочку действий. Команда всегда начинается со слова «протокол»."
+                    color: PersonalTheme.muted
+                    font.family: PersonalTheme.bodyFont
+                    font.pixelSize: PersonalTheme.body
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+            }
+
+            PersonalPanel {
+                Layout.fillWidth: true
+                Layout.preferredHeight: protocolEditor.implicitHeight + 36
+                elevated: true
+
+                ColumnLayout {
+                    id: protocolEditor
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 18
+                    spacing: 12
+
+                    Shared.LabelSharp {
+                        text: "КОДОВАЯ ФРАЗА"
+                        color: PersonalTheme.accent
+                        font.family: PersonalTheme.utilityFont
+                        font.pixelSize: PersonalTheme.micro
+                        font.weight: Font.DemiBold
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        Rectangle {
+                            Layout.preferredWidth: 92
+                            Layout.preferredHeight: 42
+                            color: PersonalTheme.accentGhost
+                            border.color: PersonalTheme.border
+                            Shared.LabelSharp {
+                                anchors.centerIn: parent
+                                text: "протокол"
+                                color: PersonalTheme.accent
+                                font.family: PersonalTheme.utilityFont
+                                font.pixelSize: PersonalTheme.body
+                            }
+                        }
+                        TextField {
+                            id: phraseField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 42
+                            placeholderText: "например, рабочий режим"
+                            color: PersonalTheme.text
+                            font.family: PersonalTheme.bodyFont
+                            font.pixelSize: PersonalTheme.body
+                            renderType: Text.NativeRendering
+                            background: Rectangle {
+                                color: PersonalTheme.surface
+                                border.color: phraseField.activeFocus ? PersonalTheme.accent : PersonalTheme.border
+                            }
+                        }
+                    }
+
+                    Shared.LabelSharp {
+                        text: "ПОСЛЕДОВАТЕЛЬНОСТЬ ДЕЙСТВИЙ"
+                        color: PersonalTheme.accent
+                        font.family: PersonalTheme.utilityFont
+                        font.pixelSize: PersonalTheme.micro
+                        font.weight: Font.DemiBold
+                    }
+                    Repeater {
+                        model: root.draftActions
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            height: 38
+                            radius: PersonalTheme.radiusSmall
+                            color: PersonalTheme.surface
+                            border.color: PersonalTheme.border
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 8
+                                Shared.LabelSharp {
+                                    text: (index + 1) + ""
+                                    color: PersonalTheme.accent
+                                    font.family: PersonalTheme.utilityFont
+                                    font.pixelSize: PersonalTheme.caption
+                                }
+                                Shared.LabelSharp {
+                                    Layout.fillWidth: true
+                                    text: root.actionTitle(modelData) + (modelData.target ? " · " + modelData.target : "")
+                                    color: PersonalTheme.text
+                                    font.family: PersonalTheme.bodyFont
+                                    font.pixelSize: PersonalTheme.body
+                                }
+                                Button {
+                                    text: "×"
+                                    flat: true
+                                    onClicked: {
+                                        const updated = root.draftActions.slice()
+                                        updated.splice(index, 1)
+                                        root.draftActions = updated
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        ComboBox {
+                            id: actionType
+                            Layout.preferredWidth: 225
+                            model: root.actionTypes
+                            textRole: "title"
+                        }
+                        TextField {
+                            id: actionTarget
+                            Layout.fillWidth: true
+                            visible: root.actionTypes[actionType.currentIndex].needsTarget
+                            placeholderText: actionType.currentIndex === 1 ? "Название закрываемой программы" : "Название программы"
+                            color: PersonalTheme.text
+                            font.family: PersonalTheme.bodyFont
+                            font.pixelSize: PersonalTheme.body
+                            renderType: Text.NativeRendering
+                        }
+                        Button {
+                            text: "Добавить действие"
+                            enabled: !root.actionTypes[actionType.currentIndex].needsTarget || actionTarget.text.trim().length > 0
+                            onClicked: {
+                                const selected = root.actionTypes[actionType.currentIndex]
+                                root.draftActions = root.draftActions.concat([{ type: selected.type, target: actionTarget.text.trim() }])
+                                actionTarget.clear()
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Item { Layout.fillWidth: true }
+                        Button {
+                            text: "Сохранить протокол"
+                            enabled: phraseField.text.trim().length > 0 && root.draftActions.length > 0
+                            onClicked: {
+                                if (backend.saveCustomProtocol(phraseField.text, root.draftActions)) {
+                                    phraseField.clear()
+                                    root.draftActions = []
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Shared.LabelSharp {
+                visible: backend.customProtocolItems.length === 0
+                text: "Сохранённых протоколов пока нет. Создайте первый сценарий выше."
+                color: PersonalTheme.muted
+                font.family: PersonalTheme.bodyFont
+                font.pixelSize: PersonalTheme.body
+            }
+
+            Repeater {
+                model: backend.customProtocolItems
+                delegate: PersonalPanel {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: protocolCard.implicitHeight + 28
+                    ColumnLayout {
+                        id: protocolCard
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 14
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Shared.LabelSmooth {
+                                Layout.fillWidth: true
+                                text: modelData.command
+                                color: PersonalTheme.text
+                                font.family: PersonalTheme.bodyFont
+                                font.pixelSize: PersonalTheme.title
+                            }
+                            Button { text: "Запустить"; onClicked: backend.executeCommand(modelData.command) }
+                            Button { text: "Удалить"; onClicked: backend.removeCustomProtocol(modelData.phrase) }
+                        }
+                        Repeater {
+                            model: modelData.actions
+                            delegate: Shared.LabelSharp {
+                                required property var modelData
+                                required property int index
+                                text: (index + 1) + ". " + modelData.title + (modelData.target ? " — " + modelData.target : "")
+                                color: PersonalTheme.muted
+                                font.family: PersonalTheme.bodyFont
+                                font.pixelSize: PersonalTheme.caption
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.preferredHeight: 12 }
+        }
     }
 }

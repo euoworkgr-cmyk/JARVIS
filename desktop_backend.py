@@ -193,6 +193,7 @@ class DesktopBackend(QObject):
     systemStatsChanged = Signal()
     voiceStatusChanged = Signal()
     preferencesChanged = Signal()
+    protocolsChanged = Signal()
     commandOutcome = Signal(object)
 
     showMainRequested = Signal()
@@ -487,6 +488,35 @@ class DesktopBackend(QObject):
                 "symbol": "⌁",
                 "extra": False,
             },
+        ]
+
+    @Property("QVariantList", notify=protocolsChanged)
+    def customProtocolItems(self) -> list[dict[str, Any]]:
+        action_titles = {
+            "launch": "Открыть",
+            "close": "Закрыть",
+            "volume_up": "Сделать громче",
+            "volume_down": "Сделать тише",
+            "volume_mute": "Включить / выключить звук",
+            "show_desktop": "Показать рабочий стол",
+            "lock_pc": "Заблокировать ПК",
+            "sleep": "Спящий режим",
+            "shutdown": "Выключить ПК",
+            "restart": "Перезагрузить ПК",
+        }
+        return [
+            {
+                "phrase": item["phrase"],
+                "command": f"протокол {item['phrase']}",
+                "actions": [
+                    {
+                        **action,
+                        "title": action_titles.get(action["type"], action["type"]),
+                    }
+                    for action in item["actions"]
+                ],
+            }
+            for item in self.service.protocols.items
         ]
 
     @Property("QVariantList", notify=historyChanged)
@@ -975,6 +1005,28 @@ class DesktopBackend(QObject):
         command = commands.get(protocol_id)
         if command:
             self.executeCommand(command)
+
+    @Slot(str, "QVariantList", result=bool)
+    def saveCustomProtocol(self, phrase: str, actions: list[dict[str, Any]]) -> bool:
+        try:
+            self.service.protocols.save_protocol(phrase, list(actions))
+        except (OSError, ValueError) as error:
+            self._handle_outcome(CommandOutcome("error", "Не удалось сохранить протокол", str(error)))
+            return False
+        self.protocolsChanged.emit()
+        self._set_message(CommandOutcome("success", "Протокол сохранён", f"Команда: протокол {self.service.protocols.normalize_phrase(phrase)}"))
+        return True
+
+    @Slot(str)
+    def removeCustomProtocol(self, phrase: str) -> None:
+        try:
+            removed = self.service.protocols.remove_protocol(phrase)
+        except OSError as error:
+            self._handle_outcome(CommandOutcome("error", "Не удалось удалить протокол", str(error)))
+            return
+        if removed:
+            self.protocolsChanged.emit()
+            self._set_message(CommandOutcome("success", "Протокол удалён"))
 
     @Slot()
     def refreshSystemStats(self) -> None:

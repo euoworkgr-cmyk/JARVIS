@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 import assistant
-from command_service import CommandRequest, CommandService, HistoryStore, NotesStore
+from command_service import CommandRequest, CommandService, HistoryStore, NotesStore, ProtocolStore
 from game_mode import GameModeResult, GameModeScan, ProcessCandidate
 
 
@@ -102,6 +102,62 @@ class NotesStoreTests(unittest.TestCase):
 class CommandServiceTests(unittest.TestCase):
     def make_service(self, path: Path) -> CommandService:
         return CommandService(program_map={"chrome": "Chrome"}, history=HistoryStore(path))
+
+    def test_custom_protocol_is_saved_and_runs_actions_in_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            protocols = ProtocolStore(root / "protocols.json")
+            protocols.save_protocol(
+                "Протокол рабочий режим",
+                [
+                    {"type": "launch", "target": "chrome"},
+                    {"type": "volume_up", "target": ""},
+                ],
+            )
+            service = CommandService(
+                program_map={"chrome": "Chrome"},
+                history=HistoryStore(root / "history.json"),
+                protocols=protocols,
+            )
+            with (
+                patch("command_service.assistant.open_program", return_value=assistant.LaunchResult("success", "ok")) as open_mock,
+                patch("command_service._send_windows_key") as key_mock,
+            ):
+                outcome = service.execute("протокол рабочий режим")
+
+        self.assertEqual(outcome.status, "success")
+        open_mock.assert_called_once_with("chrome", {"chrome": "Chrome"})
+        key_mock.assert_called_once_with(0xAF)
+
+    def test_unknown_protocol_returns_clear_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = CommandService(
+                program_map={},
+                history=HistoryStore(root / "history.json"),
+                protocols=ProtocolStore(root / "protocols.json"),
+            )
+
+            outcome = service.execute("протокол несуществующий")
+
+        self.assertEqual(outcome.status, "not_found")
+        self.assertIn("не найден", outcome.title)
+
+    def test_power_protocol_requires_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            protocols = ProtocolStore(root / "protocols.json")
+            protocols.save_protocol("сон", [{"type": "sleep", "target": ""}])
+            service = CommandService(
+                program_map={},
+                history=HistoryStore(root / "history.json"),
+                protocols=protocols,
+            )
+
+            outcome = service.execute("протокол сон")
+
+        self.assertEqual(outcome.status, "pending")
+        self.assertEqual(outcome.data["kind"], "protocol")
 
     @patch("command_service.assistant.open_program")
     def test_regular_command_returns_structured_outcome(self, open_mock) -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -50,7 +51,7 @@ class CommandOutcome:
 @dataclass(frozen=True)
 class PendingAction:
     id: str
-    kind: Literal["power", "game_mode", "kill", "clear_history"]
+    kind: Literal["power", "game_mode", "kill", "clear_history", "protocol"]
     command: str
     title: str
     detail: str
@@ -254,6 +255,88 @@ class NotesStore(JsonListStore):
         return []
 
 
+PROTOCOL_ACTION_TYPES = {
+    "launch",
+    "close",
+    "volume_up",
+    "volume_down",
+    "volume_mute",
+    "show_desktop",
+    "lock_pc",
+    "sleep",
+    "shutdown",
+    "restart",
+}
+
+
+class ProtocolStore(JsonListStore):
+    def __init__(self, path: Path | None = None) -> None:
+        super().__init__(path or app_data_directory() / "protocols.json")
+        self.items = [item for item in self.items if self._valid_item(item)]
+
+    @staticmethod
+    def normalize_phrase(phrase: str) -> str:
+        normalized = " ".join(str(phrase).strip().casefold().split())
+        if normalized == "протокол":
+            return ""
+        if normalized.startswith("протокол "):
+            normalized = normalized.removeprefix("протокол ").strip()
+        return normalized
+
+    @staticmethod
+    def _valid_item(item: Any) -> bool:
+        return (
+            isinstance(item, dict)
+            and isinstance(item.get("phrase"), str)
+            and bool(item["phrase"].strip())
+            and isinstance(item.get("actions"), list)
+            and bool(item["actions"])
+        )
+
+    def save_protocol(self, phrase: str, actions: list[dict[str, Any]]) -> None:
+        normalized = self.normalize_phrase(phrase)
+        if not normalized:
+            raise ValueError("Введите кодовую фразу после слова «протокол».")
+        clean_actions: list[dict[str, str]] = []
+        for action in actions:
+            action_type = str(action.get("type", "")).strip().casefold()
+            target = " ".join(str(action.get("target", "")).strip().split())
+            if action_type not in PROTOCOL_ACTION_TYPES:
+                raise ValueError("В протоколе есть неизвестное действие.")
+            if action_type in {"launch", "close"} and not target:
+                raise ValueError("Для запуска или закрытия укажите программу.")
+            clean_actions.append({"type": action_type, "target": target})
+        if not clean_actions:
+            raise ValueError("Добавьте хотя бы одно действие.")
+        updated = [item for item in self.items if item["phrase"] != normalized]
+        self._save_items([*updated, {"phrase": normalized, "actions": clean_actions}])
+
+    def remove_protocol(self, phrase: str) -> bool:
+        normalized = self.normalize_phrase(phrase)
+        updated = [item for item in self.items if item["phrase"] != normalized]
+        if len(updated) == len(self.items):
+            return False
+        self._save_items(updated)
+        return True
+
+    def find(self, phrase: str) -> dict[str, Any] | None:
+        normalized = self.normalize_phrase(phrase)
+        return next((item for item in self.items if item["phrase"] == normalized), None)
+
+
+def _send_windows_key(virtual_key: int, *, with_windows_key: bool = False) -> None:
+    if os.name != "nt":
+        raise OSError("Системное действие доступно только в Windows.")
+    user32 = ctypes.windll.user32
+    key_up = 0x0002
+    if with_windows_key:
+        user32.keybd_event(0x5B, 0, 0, 0)
+    user32.keybd_event(virtual_key, 0, 0, 0)
+    user32.keybd_event(virtual_key, 0, key_up, 0)
+    if with_windows_key:
+        user32.keybd_event(0x5B, 0, key_up, 0)
+
+
 def _candidate_dict(candidate: ProcessCandidate) -> dict[str, Any]:
     return {
         "pid": candidate.pid,
@@ -270,9 +353,11 @@ class CommandService:
         *,
         program_map: dict[str, str] | None = None,
         history: HistoryStore | None = None,
+        protocols: ProtocolStore | None = None,
     ) -> None:
         self.program_map = dict(program_map) if program_map is not None else assistant.get_program_map()
         self.history = history or HistoryStore()
+        self.protocols = protocols or ProtocolStore()
         self._pending: dict[str, PendingAction] = {}
 
     @property
@@ -313,6 +398,23 @@ class CommandService:
     def _prepare(self, request: CommandRequest) -> CommandOutcome:
         command = request.text
         lowered = command.casefold()
+
+        if lowered == "протокол":
+            return CommandOutcome("not_found", "После слова «протокол» нужна кодовая фраза")
+        if lowered.startswith("протокол "):
+            protocol = self.protocols.find(command)
+            if protocol is None:
+                return CommandOutcome("not_found", f"Протокол «{command.split(maxsplit=1)[1]}» не найден")
+            dangerous = any(action["type"] in {"sleep", "shutdown", "restart"} for action in protocol["actions"])
+            if dangerous:
+                return self._pending_outcome(
+                    "protocol",
+                    command,
+                    f"Запустить протокол «{protocol['phrase']}»?",
+                    "Протокол содержит управление питанием компьютера.",
+                    protocol,
+                )
+            return self._execute_protocol_item(protocol)
 
         if lowered in assistant.EXIT_COMMANDS:
             return CommandOutcome("exit", "Завершаю Supersonic")
@@ -425,6 +527,66 @@ class CommandService:
             program_title=matched_name or program_name,
         )
 
+    def _execute_protocol(self, command: str) -> CommandOutcome:
+        protocol = self.protocols.find(command)
+        if protocol is None:
+            return CommandOutcome("not_found", f"Протокол «{command.removeprefix('протокол ').strip()}» не найден")
+        return self._execute_protocol_item(protocol)
+
+    def _execute_protocol_item(self, protocol: dict[str, Any]) -> CommandOutcome:
+        completed: list[str] = []
+        for action in protocol["actions"]:
+            action_type = action["type"]
+            target = action.get("target", "")
+            if action_type == "launch":
+                result = assistant.open_program(target, self.program_map)
+                if result.kind != "success":
+                    return CommandOutcome("error", "Протокол остановлен", result.title)
+                completed.append(f"открыто: {target}")
+            elif action_type == "close":
+                scan = scan_named_processes(assistant.normalize_kill_target(target))
+                if scan.candidates:
+                    result = activate_game_mode(scan, force=True)
+                    if result.failed:
+                        return CommandOutcome("error", "Протокол остановлен", f"Не удалось закрыть {target}")
+                completed.append(f"закрыто: {target}")
+            elif action_type == "volume_up":
+                _send_windows_key(0xAF)
+                completed.append("громкость увеличена")
+            elif action_type == "volume_down":
+                _send_windows_key(0xAE)
+                completed.append("громкость уменьшена")
+            elif action_type == "volume_mute":
+                _send_windows_key(0xAD)
+                completed.append("звук переключён")
+            elif action_type == "show_desktop":
+                _send_windows_key(0x44, with_windows_key=True)
+                completed.append("показан рабочий стол")
+            elif action_type == "lock_pc":
+                if os.name != "nt" or not ctypes.windll.user32.LockWorkStation():
+                    raise OSError("Не удалось заблокировать компьютер.")
+                completed.append("компьютер заблокирован")
+            elif action_type in {"sleep", "shutdown", "restart"}:
+                power_action = {
+                    "sleep": assistant.PowerCommand("sleep"),
+                    "shutdown": assistant.PowerCommand("shutdown"),
+                    "restart": assistant.PowerCommand("restart"),
+                }[action_type]
+                result = assistant.execute_power_command(power_action)
+                if result.kind != "success":
+                    return CommandOutcome("error", "Протокол остановлен", result.title)
+                completed.append({
+                    "sleep": "включён спящий режим",
+                    "shutdown": "запущено выключение",
+                    "restart": "запущена перезагрузка",
+                }[action_type])
+        return CommandOutcome(
+            "success",
+            f"Протокол «{protocol['phrase']}» выполнен",
+            " · ".join(completed),
+            {"action": "protocol", "protocol": protocol["phrase"]},
+        )
+
     def _pending_outcome(
         self,
         kind: PendingAction.__annotations__["kind"],
@@ -451,6 +613,8 @@ class CommandService:
                 return CommandOutcome("success", "История очищена")
             if action.kind == "power":
                 outcome = self._launch_outcome(assistant.execute_power_command(action.payload))
+            elif action.kind == "protocol":
+                outcome = self._execute_protocol_item(action.payload)
             else:
                 result = activate_game_mode(action.payload, force=action.kind == "kill")
                 if result.failed:

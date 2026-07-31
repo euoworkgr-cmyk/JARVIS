@@ -40,6 +40,9 @@ class PersonalAppTests(unittest.TestCase):
         self.assertIn('label: "Заметки"', personal_source)
         self.assertIn('PersonalNotesPage', personal_source)
         self.assertIn('PersonalCustomizationPage', personal_source)
+        customization_source = (root / "qml" / "personal" / "PersonalCustomizationPage.qml").read_text(encoding="utf-8")
+        self.assertIn('text: "Настройка протоколов"', customization_source)
+        self.assertIn("saveCustomProtocol", customization_source)
         self.assertIn("load_pet=True", (root / "personal_assistant.py").read_text(encoding="utf-8"))
 
         engine = QQmlApplicationEngine()
